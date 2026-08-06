@@ -1,0 +1,24 @@
+{
+  "model_id": "FinText/Chronos_Small_2021_Global",
+  "model_size": "~46.2M parameters (Chronos-Small)",
+  "financial_pretraining_cutoff": 2021,
+  "rounds": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12
+  ],
+  "context_length": 512,
+  "prediction_length": 20,
+  "num_samples": 100,
+  "random_seed": 42,
+  "batch_size": 10
+}
