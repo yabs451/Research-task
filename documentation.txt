@@ -254,6 +254,8 @@ Completed
     (see the Stage 2 section below). All 9 focused tests pass.
   - Stage 3: construction and validation of the 12 M6 rolling-origin model
     contexts (see the Stage 3 section below). All 8 focused tests pass.
+  - Chronos-T5 Base 200M Round 1 inference pilot: notebook PREPARED but NOT
+    yet executed (see the pilot section below). No forecasts exist yet.
 
 Unresolved issues
   - None blocking. Known, documented data facts (not defects): CARR has 511
@@ -265,11 +267,13 @@ Unresolved issues
 
 Stage 4 readiness
   - The 12 rolling-origin contexts are built, validated and ready for the
-    model-wrapper stage.
+    model-wrapper stage. The first inference notebook (Chronos-T5 Base,
+    Round 1) is prepared and awaiting manual execution in Google Colab.
 
 Next planned stage
-  - Stage 4: model inference over the 12 contexts, then realised M6 target
-    construction, quintile probability conversion and RPS evaluation.
+  - Stage 4: model inference over the 12 contexts, beginning with the
+    Chronos-T5 Base Round 1 pilot, then realised M6 target construction,
+    quintile probability conversion and RPS evaluation.
 
 --------------------------------------------------------------------------------
 F. REPRODUCIBILITY
@@ -531,6 +535,94 @@ Next planned stage
   Stage 4: model wrappers and inference over the 12 contexts, followed by
   realised target construction, quintile probability conversion and RPS
   evaluation.
+
+--------------------------------------------------------------------------------
+I. CHRONOS-T5 BASE 200M — ROUND 1 INFERENCE PILOT
+   (notebook prepared 2026-08-05; NOT YET EXECUTED)
+--------------------------------------------------------------------------------
+
+Status
+  This is the FIRST model-inference experiment of the project. The notebook has
+  been prepared but has NOT been run: no cells were executed, no model was
+  downloaded, no forecasts exist, and no output files have been produced. The
+  results sections of this record must only be completed after the notebook is
+  executed manually in Google Colab.
+
+Purpose
+  A pilot to establish whether Chronos-T5 Base can be run successfully on the
+  Stage 3 Round 1 context and whether its raw sampled forecasts can be
+  persisted. If the run succeeds it may become an actual research result, so
+  the implementation is written to be correct and reproducible rather than
+  exploratory.
+
+Model
+  amazon/chronos-t5-base (Chronos-T5 Base, 200M parameters), used for
+  inference only — no training and no fine-tuning. Chronos is a UNIVARIATE
+  forecasting model: it maps a single series' history to that same series'
+  future. Each of the 100 M6 assets is therefore forecast independently, as
+  its own time series. Assets are grouped into batches (SERIES_BATCH_SIZE,
+  default 10) purely for GPU efficiency; batching is a computational device
+  only and cannot let one asset's history inform another's forecast, nor does
+  it change the asset ordering, the number of trajectories, or the horizon.
+
+Experimental design
+  - Round: M6 Round 1, forecast origin 2022-03-04 (Friday).
+  - Context: the existing Stage 3 file round_01_context.csv — 512 weekday
+    daily log returns per asset, 2020-03-19 to 2022-03-04, 100 assets in
+    official M6 order. The values are used exactly as produced in Stages 2-3.
+  - Forecast horizon: 20 weekdays, 2022-03-07 to 2022-04-01 (the Round 1
+    evaluation period).
+  - Sampling: 100 sampled trajectories per asset; random seed 42 set on both
+    CPU and GPU generators immediately before inference.
+  - Expected raw output shape: (100 assets, 100 trajectories, 20 weekdays).
+
+No repeated preprocessing
+  The notebook performs no data preparation of its own. It does not normalise,
+  standardise, smooth, clip, average, take medians, remove extreme returns,
+  fill missing values with zero or backward-fill history. An assertion in the
+  loading cell proves the model input is a plain transpose of the loaded
+  context values, and the context file's SHA-256 is recorded in the run
+  metadata. CARR's and OGN's genuine leading NaN values are deliberately left
+  as NaN: Chronos's tokenizer marks missing observations in its attention
+  mask, so those assets are forecast from their real (shorter) history without
+  any fabricated padding being introduced at this point.
+
+Compute and storage
+  Google Colab supplies the GPU (the notebook refuses to run the 200M model on
+  CPU and instead instructs the user to attach a GPU runtime; dtype is
+  bfloat16 where supported, otherwise float16). Google Drive serves two roles,
+  because a Colab runtime cannot see the local VS Code repository and loses
+  its own disk when it ends: it supplies the Round 1 context file to Colab,
+  and it permanently stores the outputs. A single configuration constant
+  (DRIVE_PROJECT_DIR) defines both the input path and the output folder.
+
+Planned outputs (created only when the notebook is run)
+  <DRIVE_PROJECT_DIR>/outputs/chronos_t5_base/
+    chronos_t5_base_round01_samples.npz    raw (100, 100, 20) array plus
+                                           asset_symbols and forecast_dates
+    chronos_t5_base_round01_metadata.json  model id, round, context dates,
+                                           counts, seed, output shape, package
+                                           versions, context hash, timestamp
+    chronos_t5_base_round01_inference_report.md  to be copied into the
+                                           repository as
+                                           reports/chronos_t5_base_round01_inference_report.md
+  The raw trajectories are saved immediately after inference, before any
+  analysis, and the saved file is reloaded and checked for shape, value
+  equality and unchanged asset ordering.
+
+Scope boundary — deliberately not done
+  The pilot stops at the RAW sampled trajectories. It does not sum the 20
+  returns, convert them to four-week percentage returns, rank assets, assign
+  M6 quintiles, construct quintile probabilities, load realised future
+  outcomes, or compute RPS. Keeping the raw samples means every later
+  post-processing decision can be made, documented and revised without
+  re-running the model.
+
+Notebook
+  Notebooks/Chronos_Base_200M_round1.ipynb — 21 cells (10 code cells), all
+  unexecuted, organised in run order: experiment description; install Chronos;
+  imports and settings; mount Drive; paths; load and validate context; GPU
+  check and model load; inference; save and verify; write report; summary.
 
 ================================================================================
 END OF CURRENT RECORD — append future stages below this line's section style.

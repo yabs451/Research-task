@@ -1,0 +1,20 @@
+{
+  "model_id": "amazon/chronos-t5-base",
+  "round": 1,
+  "context_start_date": "2020-03-19",
+  "context_end_date": "2022-03-04",
+  "num_assets": 100,
+  "num_samples": 100,
+  "prediction_length": 20,
+  "random_seed": 42,
+  "output_shape": [
+    100,
+    100,
+    20
+  ],
+  "chronos_forecasting_version": "2.3.1",
+  "torch_version": "2.11.0+cu128",
+  "dtype": "torch.bfloat16",
+  "context_file_sha256": "ba19ad0af578e6ecb4e1d7f70fa509f2c0c24abda93e88902b7d5c1252b58d80",
+  "run_timestamp_utc": "2026-08-05T13:11:29+00:00"
+}
