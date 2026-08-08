@@ -1,0 +1,37 @@
+model,round,mean_RPS
+Chronos T5 Base 200M,1,0.23089079999999998
+Chronos T5 Base 200M,2,0.2312492
+Chronos T5 Base 200M,3,0.208048
+Chronos T5 Base 200M,4,0.23031079999999998
+Chronos T5 Base 200M,5,0.21424759999999998
+Chronos T5 Base 200M,6,0.23401319999999998
+Chronos T5 Base 200M,7,0.19771360000000002
+Chronos T5 Base 200M,8,0.18598800000000001
+Chronos T5 Base 200M,9,0.2765268
+Chronos T5 Base 200M,10,0.1834236
+Chronos T5 Base 200M,11,0.202942
+Chronos T5 Base 200M,12,0.327434
+Financial Chronos Small 46M 2021 Global,1,0.1573572
+Financial Chronos Small 46M 2021 Global,2,0.157182
+Financial Chronos Small 46M 2021 Global,3,0.18247319999999997
+Financial Chronos Small 46M 2021 Global,4,0.1770372
+Financial Chronos Small 46M 2021 Global,5,0.1927732
+Financial Chronos Small 46M 2021 Global,6,0.1909688
+Financial Chronos Small 46M 2021 Global,7,0.21530480000000002
+Financial Chronos Small 46M 2021 Global,8,0.1861388
+Financial Chronos Small 46M 2021 Global,9,0.177572
+Financial Chronos Small 46M 2021 Global,10,0.16856359999999998
+Financial Chronos Small 46M 2021 Global,11,0.1733732
+Financial Chronos Small 46M 2021 Global,12,0.17367480000000002
+Naive equal-probability benchmark,1,0.16
+Naive equal-probability benchmark,2,0.16
+Naive equal-probability benchmark,3,0.16
+Naive equal-probability benchmark,4,0.16
+Naive equal-probability benchmark,5,0.16
+Naive equal-probability benchmark,6,0.16
+Naive equal-probability benchmark,7,0.16
+Naive equal-probability benchmark,8,0.16
+Naive equal-probability benchmark,9,0.16
+Naive equal-probability benchmark,10,0.16
+Naive equal-probability benchmark,11,0.16
+Naive equal-probability benchmark,12,0.16

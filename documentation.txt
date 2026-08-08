@@ -242,7 +242,7 @@ Why CARR and OGN are not backfilled
   than forcing a fixed-length context.
 
 --------------------------------------------------------------------------------
-E. CURRENT STATUS (as of 2026-07-17, updated after Stage 2)
+E. CURRENT STATUS (as of 2026-08-06, updated after Stage 5)
 --------------------------------------------------------------------------------
 
 Completed
@@ -254,26 +254,54 @@ Completed
     (see the Stage 2 section below). All 9 focused tests pass.
   - Stage 3: construction and validation of the 12 M6 rolling-origin model
     contexts (see the Stage 3 section below). All 8 focused tests pass.
-  - Chronos-T5 Base 200M Round 1 inference pilot: notebook PREPARED but NOT
-    yet executed (see the pilot section below). No forecasts exist yet.
+  - Stage 4: raw inference COMPLETED for both models currently under
+    evaluation — Chronos-T5 Base 200M (all 12 rounds) and the financially
+    pretrained Chronos-Small 46M (FinText 2021 Global, all 12 rounds). 24 raw
+    NPZ artifacts and their inference reports are in the repository (see
+    sections I and J). The Round 1 pilot described in section I was executed
+    on 2026-08-05 and its result is one of those 24 artifacts.
+  - Stage 5: M6 quintile post-processing and RPS evaluation of both models,
+    executed locally on 2026-08-06 (see section K). All 11 focused evaluator
+    tests pass.
+
+Headline results so far (lower RPS is better)
+  Naive equal-probability benchmark        0.160000
+  Chronos-2 120M + spatiotemporal copula   0.165418   (see section M)
+  Chronos-2 120M + independent sampling    0.165559   (see section N)
+  Financial Chronos Small 46M 2021 Global  0.179368
+  Chronos T5 Base 200M                     0.226899
+  Chronos-2 is far ahead of both earlier models and close to the benchmark,
+  though still short of it. Its two post-processing variants are effectively
+  tied (0.000141 apart), which indicates the result comes from Chronos-2's
+  marginal quantiles rather than from the dependence structure imposed on them.
+  Note the Chronos-2 figures depend on a post-processing choice as well as on
+  the model, so they are not a like-for-like model comparison with the two
+  sampled-trajectory models.
 
 Unresolved issues
   - None blocking. Known, documented data facts (not defects): CARR has 511
     valid context returns in round 1 (512 thereafter); OGN is short in every
     round (210 valid returns in round 1 rising by 20 per round to 430 in
-    round 12); the model-wrapper stage must accommodate shorter contexts
-    rather than padding. DRE forecasts in post-acquisition rounds must
-    respect the known-zero competition treatment.
+    round 12); both were passed to the models as genuine NaNs rather than
+    padded.
+  - Open methodological item: neither model was told that DRE's competition
+    return is fixed at zero after 2022-10-03, and neither inferred it. The
+    primary Stage 5 results deliberately use the raw forecasts. DRE-zeroed
+    reference copies exist for rounds 9-12 only; Round 8 (whose forecast
+    window crosses the acquisition date) still needs a date-specific rule
+    before any DRE-adjusted evaluation is run.
 
-Stage 4 readiness
-  - The 12 rolling-origin contexts are built, validated and ready for the
-    model-wrapper stage. The first inference notebook (Chronos-T5 Base,
-    Round 1) is prepared and awaiting manual execution in Google Colab.
+  - Chronos-2 (amazon/chronos-2, ~120M, zero-shot): inference EXECUTED; the 12
+    raw quantile NPZ files are in Results/Chronos_2_120M/round_outputs/ and were
+    revalidated (see section L).
+  - Chronos-2 post-processing method 1, spatiotemporal Gaussian copula, with M6
+    quintile probabilities and RPS (see section M).
 
 Next planned stage
-  - Stage 4: model inference over the 12 contexts, beginning with the
-    Chronos-T5 Base Round 1 pilot, then realised M6 target construction,
-    quintile probability conversion and RPS evaluation.
+  - Consider further Chronos-2 post-processing methods for comparison against
+    the copula, extend the model comparison (further checkpoints and/or
+    statistical benchmarks), and decide whether to run the DRE-adjusted
+    sensitivity evaluation using the derived copies produced in Stage 5.
 
 --------------------------------------------------------------------------------
 F. REPRODUCIBILITY
@@ -289,10 +317,21 @@ Scripts
   scripts/build_rolling_origins.py    (Stage 3; offline, deterministic,
                                        safe to rerun; no API key needed)
   tests/test_build_rolling_origins.py (Stage 3 focused rule tests; pytest)
+  Notebooks/Chronos_Base_200M_round1.ipynb            (Stage 4; Colab + GPU)
+  Notebooks/Chronos_Base_200M_rounds_2_to_12.ipynb    (Stage 4; Colab + GPU)
+  Notebooks/Financial_Chronos_Small_46M_2021_Global_rounds_1_to_12.ipynb
+                                       (Stage 4; Colab + GPU)
+  scripts/evaluate_m6_rps.py          (Stage 5; offline, deterministic, local,
+                                       no GPU; discovers models automatically)
+  tests/test_evaluate_m6_rps.py       (Stage 5 focused methodology tests; pytest)
 
 Inputs
-  Data/assets_m6.csv                          official M6 universe/prices
+  Data/assets_m6.csv                          official M6 universe/prices;
+                                              Stage 5 ground-truth source
   data/raw/m6_official/assets_m6.csv          unmodified copy for validation
+  RPS Reference/RPS and IR calculation.py     official M6 evaluator, used as
+                                              the RPS methodology reference
+                                              only (IR deliberately unused)
 
 Outputs
   data/raw/yahoo/dataset_a_adjusted_close.csv            Stage 1 raw dataset
@@ -308,11 +347,18 @@ Outputs
   reports/dataset_a_repair_report.md
   reports/dataset_a_preprocessing_report.md
   reports/rolling_origin_construction_report.md
+  Results/Chronos_T5_Base_200M/{round_outputs,reports}/          Stage 4 + 5
+  Results/Financial_Chronos_Small_46M_2021_Global/{round_outputs,reports}/
+  Results/Evaluation/                                    Stage 5 evaluation
+                                                         artifacts and report
 
 Environment
   Python 3.10.11 (Windows 11); pandas 2.2.2; numpy 1.26.4; yfinance 1.5.1;
   python-dotenv 1.2.2; requests 2.32.5; pytest 9.1.1. Dependencies listed in
   requirements.txt. Execution date for Stages 1, 1B and 2: 2026-07-17.
+  Stage 4 ran in Google Colab (NVIDIA L4 GPU, bfloat16, chronos-forecasting
+  2.3.1, torch 2.11.0+cu128) on 2026-08-05 and 2026-08-06. Stage 5 ran locally
+  on 2026-08-06 with the Python/pandas/numpy versions above — no GPU required.
 
 Warnings and limitations
   - Yahoo Finance data for delisted tickers can disappear retroactively; the
@@ -538,15 +584,19 @@ Next planned stage
 
 --------------------------------------------------------------------------------
 I. CHRONOS-T5 BASE 200M — ROUND 1 INFERENCE PILOT
-   (notebook prepared 2026-08-05; NOT YET EXECUTED)
+   (notebook prepared 2026-08-05; EXECUTED 2026-08-05)
 --------------------------------------------------------------------------------
 
 Status
-  This is the FIRST model-inference experiment of the project. The notebook has
-  been prepared but has NOT been run: no cells were executed, no model was
-  downloaded, no forecasts exist, and no output files have been produced. The
-  results sections of this record must only be completed after the notebook is
-  executed manually in Google Colab.
+  This was the FIRST model-inference experiment of the project, and it
+  succeeded. The notebook was executed manually in Google Colab on 2026-08-05
+  (run timestamp 2026-08-05T13:11:29Z). Its outputs are now in the repository:
+  Results/Chronos_T5_Base_200M/round_outputs/chronos_t5_base_round01_samples.npz
+  (verified (100, 100, 20)) plus the round 1 inference report and metadata JSON
+  in Results/Chronos_T5_Base_200M/reports/. The recorded context SHA-256
+  (ba19ad0a…) matches the repository's round_01_context.csv, confirming the
+  executed run used the Stage 3 file unaltered. Rounds 2-12 followed in a
+  separate notebook; see section J for the consolidated inference record.
 
 Purpose
   A pilot to establish whether Chronos-T5 Base can be run successfully on the
@@ -596,7 +646,8 @@ Compute and storage
   and it permanently stores the outputs. A single configuration constant
   (DRIVE_PROJECT_DIR) defines both the input path and the output folder.
 
-Planned outputs (created only when the notebook is run)
+Outputs (produced by the executed run, then copied into the repository under
+Results/Chronos_T5_Base_200M/)
   <DRIVE_PROJECT_DIR>/outputs/chronos_t5_base/
     chronos_t5_base_round01_samples.npz    raw (100, 100, 20) array plus
                                            asset_symbols and forecast_dates
@@ -623,6 +674,901 @@ Notebook
   unexecuted, organised in run order: experiment description; install Chronos;
   imports and settings; mount Drive; paths; load and validate context; GPU
   check and model load; inference; save and verify; write report; summary.
+
+--------------------------------------------------------------------------------
+J. STAGE 4 — RAW INFERENCE FOR THE TWO EVALUATED MODELS
+   (executed 2026-08-05 and 2026-08-06 in Google Colab)
+--------------------------------------------------------------------------------
+
+Status
+  COMPLETE for both models currently under evaluation. Verified from the
+  artifacts in the repository: 12 raw NPZ files per model (24 in total), each
+  containing forecast_samples of shape (100, 100, 20), asset_symbols and
+  forecast_dates, all finite, all forecast date ranges matching the Stage 3
+  round schedule.
+
+Models
+  1. amazon/chronos-t5-base — Chronos-T5 Base, 200M parameters, the general
+     time-series foundation model, used zero-shot.
+  2. FinText/Chronos_Small_2021_Global — Chronos-Small financially pretrained
+     checkpoint, 46,154,240 parameters loaded (~46.2M), pretrained on global
+     financial time series with a 2021 data cutoff. The cutoff is the reason
+     this checkpoint was chosen: the 2022-2023 M6 evaluation period is not in
+     its financial pretraining data.
+  Both are used for inference only — no training, fine-tuning or weight
+  modification.
+
+Settings (identical for both models, so the comparison is fair)
+  Context length 512 weekday daily log returns; prediction length 20 weekdays;
+  100 sampled trajectories per asset; random seed 42, reset at the start of
+  every round; series batch size 10; 100 official M6 assets in official order;
+  rounds 1-12. Raw output per round: (100 assets, 100 trajectories, 20 days).
+
+Inputs
+  The 12 Stage 3 contexts round_01..12_context.csv, used unchanged. Each
+  notebook verified the SHA-256 of every context file against the repository
+  digests before inference, so both models provably read byte-identical inputs.
+  No preprocessing was repeated: no price conversion, return recalculation,
+  normalising, standardising, smoothing, clipping, averaging, outlier removal,
+  NaN-filling or backward-filling. CARR's (round 1) and OGN's (all rounds)
+  genuine leading NaNs were passed through and handled by Chronos's
+  missing-value mask.
+
+Implementation and API decisions
+  - Chronos is univariate, so each of the 100 assets is forecast as its own
+    independent series. Assets are batched 10 at a time purely for GPU
+    efficiency; batching cannot let one asset's history inform another's
+    forecast and does not change ordering or shape.
+  - The current Chronos API takes inputs=, not context=. The original Round 1
+    notebook first used pipeline.predict(context=...), which failed against
+    chronos-forecasting 2.3.1; the working call is
+    pipeline.predict(inputs=batch, prediction_length=20, num_samples=100).
+    All later notebooks use inputs=.
+  - The FinText checkpoint's model card documents an AutoModelForSeq2SeqLM
+    route, but its config.json carries a valid chronos_config
+    (model_type seq2seq, tokenizer MeanScaleUniformBins, n_tokens 4096), so it
+    loads through the standard ChronosPipeline.from_pretrained and is queried
+    through the same predict() path as Chronos Base. Using one code path for
+    both models removes an obvious confound from the comparison. The
+    checkpoint's stored defaults (prediction_length 64, num_samples 20) are
+    overridden by the explicit call arguments.
+  - The model is loaded ONCE per notebook and reused for every round.
+  - Each round is saved immediately after inference and then reloaded and
+    verified, so a failure in a later round cannot lose earlier work.
+  - DRE: raw forecasts are preserved exactly as produced, including the
+    post-acquisition rounds. The competition's zero-return rule is deliberately
+    NOT applied at inference time; it belongs to post-processing (see K).
+
+Runtime
+  Google Colab GPU (NVIDIA L4), dtype bfloat16, chronos-forecasting 2.3.1,
+  torch 2.11.0+cu128. Chronos Base round 1 ran 2026-08-05; Chronos Base rounds
+  2-12 and all 12 Financial Chronos rounds ran 2026-08-06.
+
+Artifacts (in the repository)
+  Results/Chronos_T5_Base_200M/round_outputs/
+    chronos_t5_base_round01..12_samples.npz
+  Results/Chronos_T5_Base_200M/reports/
+    chronos_t5_base_round01_inference_report.md
+    chronos_t5_base_round01_metadata.json
+    chronos_t5_base_rounds02_12_inference_report.md
+  Results/Financial_Chronos_Small_46M_2021_Global/round_outputs/
+    financial_chronos_small_2021_global_round01..12_samples.npz
+  Results/Financial_Chronos_Small_46M_2021_Global/reports/
+    financial_chronos_small_2021_global_rounds01_12_inference_report.md
+    financial_chronos_small_2021_global_experiment.json
+  Notebooks/Chronos_Base_200M_round1.ipynb
+  Notebooks/Chronos_Base_200M_rounds_2_to_12.ipynb
+  Notebooks/Financial_Chronos_Small_46M_2021_Global_rounds_1_to_12.ipynb
+
+Validation status
+  Every round: shape (100, 100, 20), all values finite, asset ordering
+  preserved, forecast dates equal to the scheduled round window, and the saved
+  NPZ reloaded and compared against the in-memory array before moving on. The
+  Stage 5 evaluator independently re-verified all 24 files.
+
+Scope boundary
+  Stage 4 stopped at the raw sampled trajectories: no four-week returns, no
+  ranking, no quintiles, no realised outcomes, no RPS. Keeping the raw samples
+  means every post-processing decision can be revised without re-running any
+  model.
+
+--------------------------------------------------------------------------------
+K. STAGE 5 — M6 QUINTILE POST-PROCESSING AND RPS EVALUATION
+   (executed locally 2026-08-06)
+--------------------------------------------------------------------------------
+
+Why post-processing is required
+  M6 does not score return forecasts. It scores, for each asset, a probability
+  distribution over five cross-sectional quintiles of the four-week return, and
+  it scores them with the Ranked Probability Score. Chronos produces sampled
+  future log-return paths, so a defined conversion is needed from raw sample
+  paths to M6-format probabilities. Keeping the raw samples (Stage 4) and doing
+  the conversion here means the conversion is documented, testable and
+  revisable.
+
+Raw input format
+  One NPZ per model per round: forecast_samples (100 assets, 100 sampled
+  trajectories, 20 forecast weekdays), asset_symbols, forecast_dates. The NPZ
+  files are read-only research artifacts; the evaluator hashes all 24 before and
+  after each run and aborts if a single byte changed.
+
+Sampled-return conversion
+  For one asset and one sampled trajectory with daily log returns r_1..r_20:
+    L = sum(r_h)        (four-week log return)
+    R = exp(L) - 1      (four-week simple return)
+  applied to all 100 assets, all 100 samples, all 12 rounds, giving 100 x 100
+  sampled four-week returns per round.
+
+Cross-sectional ranking
+  The M6 task is cross-sectional, so each sampled future is treated as one
+  complete scenario for the whole universe: within sample s the 100 assets are
+  ranked from lowest to highest four-week return and split into five equal
+  quintiles (lowest 20% = Rank1 … highest 20% = Rank5). This is repeated for all
+  100 sampled futures.
+
+Probability construction
+  An asset's probability for a quintile is its average membership of that
+  quintile across the 100 sampled futures (e.g. membership counts 8/17/29/31/15
+  give [0.08, 0.17, 0.29, 0.31, 0.15]). Every row is checked to sum to 1
+  (observed max deviation 2.2e-16) and to lie within [0, 1].
+
+Tie handling (official principle, with two documented departures)
+  Ranking uses rank(method="min"); a block of k tied assets occupies k
+  consecutive rank slots and each tied asset receives the AVERAGE quintile
+  membership of those slots — the official "Handle Ties" principle from
+  RPS and IR calculation.py. Untied assets therefore receive one-hot targets
+  such as [0,0,0,1,0], and fractional membership is retained when a tied block
+  crosses a quintile boundary. The same function is used for realised outcomes
+  and for sampled forecasts; applying it to sampled forecasts is this project's
+  post-processing extension, since the official script defines the treatment
+  only for realised outcomes. It matters because Chronos output is quantised
+  and can repeat values.
+  Departure 1: quintile boundaries are computed from the number of ranked
+  assets (100). The official script uses total_ranks = max(min-rank), which
+  falls below 100 whenever ties exist and would shift every boundary. The two
+  definitions agree exactly when there are no ties.
+  Departure 2: the official if/elif chain assigns membership only for the FIRST
+  quintile a tied block touches, so a boundary-straddling block yields a row
+  summing to less than 1. Here membership is spread over every quintile the
+  block spans, so all rows sum to 1, as the M6 probability format requires.
+  A faithful port of the official tie block is kept in the evaluator solely to
+  measure agreement. In practice the realised M6 returns contain NO ties in any
+  of the 12 rounds, so all 1,200 ground-truth rows match the official port
+  exactly and neither departure affects any reported ground-truth value.
+
+Ground truth (built once, reused by both models)
+  Source: Data/assets_m6.csv — the official M6 daily adjusted closes (100
+  symbols, 2022-01-31 to 2023-02-17). The Stage 2/3 Yahoo panel is NOT used to
+  define outcomes. For round r the interval is anchor r (the forecast origin) to
+  anchor r+1, exactly the interval the model forecast, and
+    actual_return = (close_price - open_price) / open_price
+  matching the official evaluator. Missing prices follow the official rule —
+  the most recent available price at or before the date is carried forward —
+  applied over the full price history rather than only within the round window,
+  because DRE stops appearing in the file after 2022-11-28 and the official
+  in-window lookup would have nothing to fall back on for the last rounds. No
+  other interpolation is used. The realised returns are then ranked
+  cross-sectionally and converted to Rank1..Rank5 with the same tie-aware
+  function. All 13 anchors are present in the price file, and the resulting DRE
+  return is exactly 0.0 in rounds 9-12, as the competition treatment requires.
+
+RPS
+  Reference: RPS Reference/RPS and IR calculation.py (Mcompetitions/M6-methods).
+  Only the RPS methodology was extracted and reimplemented; the file is not
+  executed or copied wholesale. For one asset:
+    RPS = mean( (cumsum(actual) - cumsum(forecast))^2 )
+  over the five cumulative positions. Aggregation: one RPS per asset per round
+  (1,200 per model), the round score is the mean of its 100 asset scores, and
+  the final score is the mean of the 12 round scores. Because every round holds
+  exactly 100 assets this equals the mean of all 1,200 values, which the
+  evaluator verifies (agreement to 0.0). Lower is better.
+
+Information ratio — excluded
+  IR is outside this research. IR_calculation() is not called, ported or
+  reproduced, and no investment weights, portfolio returns, return standard
+  deviations, information ratios or overall M6 competition rankings are
+  computed anywhere in Stage 5.
+
+Sanity checks performed (all passed)
+  Probability rows sum to 1 and lie in [0, 1]; ground-truth rows sum to 1;
+  12 rounds x 100 assets for every model; NPZ shapes (100, 100, 20) and all
+  values finite; predicted and actual asset universes identical; forecast dates
+  equal to the scheduled round windows; no missing RPS values; every round mean
+  equals the mean of its 100 asset scores; every final mean equals the mean of
+  the 12 round means and of the 1,200 asset scores; all 24 raw NPZ files
+  byte-identical (SHA-256) before and after the run. Focused pytest suite
+  tests/test_evaluate_m6_rps.py: 11 tests, all passing.
+
+Naive benchmark
+  The flat [0.20, 0.20, 0.20, 0.20, 0.20] forecast is scored through the same
+  evaluator rather than assumed. Its computed value is 0.160000, which matches
+  the theoretical value because the realised outcomes contain no ties and the
+  one-hot targets are spread evenly across the five quintiles. It is a
+  reference point, not a model forecast.
+
+DRE inspection (raw forecasts, unmodified)
+  Neither model produced an all-zero DRE forecast in any round; there is not a
+  single exactly-zero value in either model's DRE samples.
+  - Chronos-T5 Base learns the flat post-acquisition series almost exactly:
+    in rounds 10-12 its DRE daily log returns are tiny and non-positive (max
+    ~1.4e-10, min ~-0.0019), i.e. four-week returns of about -0.2% to +3e-9.
+  - Financial Chronos does not: in rounds 9-12 its DRE daily log returns reach
+    +/-0.14 to +/-0.16, giving four-week returns from about -48% to +85%, and
+    round 8 already shows a +0.164 daily value. The financially pretrained
+    model treats the frozen series as if it still traded.
+  The primary results use these raw forecasts unchanged, exactly as the
+  competition would have scored a live participant. Clearly labelled DRE-zeroed
+  reference copies were written for rounds 9-12 only (origins already after the
+  acquisition) as separate derived artifacts under
+  Results/Evaluation/derived_dre_adjusted/<model>/; they are NOT used for any
+  result reported here, and no raw NPZ was modified. Round 8 was deliberately
+  left untouched because its forecast window crosses the acquisition date and
+  needs a date-specific rule.
+
+Results (final mean RPS over the 12 rounds; lower is better)
+  Naive equal-probability benchmark        0.160000
+  Financial Chronos Small 46M 2021 Global  0.179368
+  Chronos T5 Base 200M                     0.226899
+
+  Per-round mean RPS
+  Round  Chronos Base   Financial Chronos   Naive
+    1      0.2309           0.1574          0.16
+    2      0.2312           0.1572          0.16
+    3      0.2080           0.1825          0.16
+    4      0.2303           0.1770          0.16
+    5      0.2142           0.1928          0.16
+    6      0.2340           0.1910          0.16
+    7      0.1977           0.2153          0.16
+    8      0.1860           0.1861          0.16
+    9      0.2765           0.1776          0.16
+   10      0.1834           0.1686          0.16
+   11      0.2029           0.1734          0.16
+   12      0.3274           0.1737          0.16
+
+  The financially pretrained Chronos-Small beats Chronos-T5 Base overall
+  (0.1794 vs 0.2269) and in 10 of the 12 rounds (Base is better in rounds 7 and
+  8, where the two are close). Neither zero-shot model beats the flat
+  benchmark; Financial Chronos is beaten by it in 10 of 12 rounds but only
+  narrowly overall (+0.019), whereas Chronos Base is worse in all 12 rounds
+  (+0.067).
+
+Why the two models differ (diagnostic, not a result)
+  RPS penalises confident-and-wrong more heavily than diffuse. The evaluator
+  records, per round, the average largest quintile probability and a dispersion
+  ratio = (spread of the assets' median predicted four-week returns) / (typical
+  spread within one asset's own samples). Chronos Base: mean max probability
+  0.529, dispersion ratio 1.97 — its cross-sectional ordering barely changes
+  between sampled futures, so it issues near-one-hot bets (39 of its 1,200 rows
+  are exactly one-hot) and is punished when they are wrong. Financial Chronos:
+  mean max probability 0.396, dispersion ratio 0.57 — sampling noise reshuffles
+  the ordering, so its probabilities stay diffuse and closer to the benchmark.
+  The Base model's low RPS is therefore an over-confidence effect, not evidence
+  of a better ranking signal.
+
+Evaluation outputs (all under Results/Evaluation/)
+  m6_ground_truth_quintiles.csv            1,200 rows: round, symbol, start/end
+                                           date, realised return, Rank1..Rank5
+  predicted_quintile_probabilities_Chronos_T5_Base_200M.csv
+  predicted_quintile_probabilities_Financial_Chronos_Small_46M_2021_Global.csv
+                                           1,200 rows each: model, round,
+                                           symbol, Rank1..Rank5 probabilities
+  rps_by_asset_Chronos_T5_Base_200M.csv    1,200 rows: model, round, symbol, RPS
+  rps_by_asset_Financial_Chronos_Small_46M_2021_Global.csv    same
+  rps_by_round.csv                         model, round, mean RPS (incl. naive)
+  model_comparison_rps.csv                 clean report table: model x rounds
+                                           1-12 + overall mean RPS
+  rps_round_comparison_long.csv            round x model long-form table
+  dre_raw_forecast_inspection.csv          per model/round DRE statistics
+  forecast_dispersion_diagnostics.csv      per model/round sharpness diagnostic
+  m6_rps_evaluation_report.md              full methodological report
+  derived_dre_adjusted/<model>/*_dre_zeroed.npz   8 derived reference copies
+  Model-specific evaluation reports were added to the existing report folders:
+    Results/Chronos_T5_Base_200M/reports/chronos_t5_base_200m_rps_evaluation_report.md
+    Results/Financial_Chronos_Small_46M_2021_Global/reports/
+      financial_chronos_small_46m_2021_global_rps_evaluation_report.md
+  The existing inference reports were not modified or replaced.
+
+Limitations
+  - 12 rounds per model is a small sample; round-to-round differences are noisy
+    and no significance testing was performed. The overall ordering
+    (Financial Chronos < Chronos Base) is consistent enough across rounds
+    (10 of 12) to be worth reporting, but the gap to the naive benchmark is the
+    more important qualitative finding.
+  - Probabilities are estimated from 100 sampled trajectories, so each is
+    resolved only to 0.01 and carries Monte Carlo error of roughly 0.02-0.05.
+    More samples would sharpen the estimates, particularly for the diffuse
+    Financial Chronos forecasts.
+  - Forecast dates come from the Stage 2/3 shared weekday calendar while
+    realised returns come from the official price file's own trading calendar.
+    Both are anchored on the same round dates, so the four-week interval
+    matches even though intermediate days need not.
+  - Both models are scored with their raw DRE predictions, which penalises
+    Financial Chronos heavily in rounds 9-12 (see the DRE inspection). A
+    DRE-adjusted sensitivity run is possible with the derived copies but has
+    not been performed.
+  - Only two models are currently evaluated; there is no statistical baseline
+    (e.g. historical-quintile-frequency or random-walk model) beyond the flat
+    benchmark.
+
+Exploratory test 1 — DRE zero-adjustment (2026-08-06)
+  Testing_What_Works/ is a new top-level folder, separate from Results/, for
+  exploratory "what improves the RPS?" checks. It holds no primary results.
+  First test: raw DRE forecasts versus DRE set to zero in rounds 9-12 (round 8
+  deliberately unchanged), reusing the Stage 5 evaluator and the derived copies
+  already in Results/Evaluation/derived_dre_adjusted/. Rounds 1-8 are identical
+  in both variants (verified, difference 0.0) and no raw NPZ was touched.
+  Outcome: the adjustment does NOT improve RPS — both models get very slightly
+  worse. Chronos Base 0.226899 -> 0.227017 (+0.000118); Financial Chronos
+  0.179368 -> 0.179398 (+0.000029). The model ranking is unchanged.
+  Reason: M6 quintiles are cross-sectional, so a 0% forecast is ranked against
+  the other 99 assets' FORECASTS, not against zero. In rounds 9-12 Chronos Base
+  gives 79-92% of the other assets a negative predicted median, so a flat 0%
+  DRE ranks near the top of the predicted cross-section, whereas DRE's realised
+  0% ranked Q1/Q3/Q3/Q2 in the realised cross-section. Zeroing therefore does
+  not move DRE to a better quintile, it only removes forecast uncertainty and
+  sharpens an incorrect call (round 9, Chronos Base: [0.04,0.04,0.13,0.63,0.16]
+  RPS 0.484 -> [0,0,0,0.87,0.13] RPS 0.603, actual Q1). The effect is tiny
+  everywhere (<=0.0014 on any round) because it is one asset of 100 in four
+  rounds of twelve.
+  Decision: keep the raw forecasts as the primary evaluation; the M6 rule fixes
+  the REALISED return at zero, not the forecast. Revisit only if Round 8's
+  date-specific treatment is defined, or as a footnote showing that the DRE
+  handling drives no conclusion.
+  Artifacts: Testing_What_Works/dre_zero_test_results.csv and
+  Testing_What_Works/dre_zero_test_summary.md.
+
+Exploratory test 2 — Financial Chronos sample-count sensitivity (2026-08-06)
+  Question: does drawing more sampled trajectories improve the RPS? Sample
+  counts tested: 100 (the primary run), 300, 500 and 1000, all on the same 12
+  rounds, the same Stage 3 contexts, the same model (FinText/
+  Chronos_Small_2021_Global), seed 42, batch size 10, context 512, horizon 20.
+  Generation note: a single predict() call for 300+ samples exhausted the Colab
+  L4's memory, so each round drew 1000 trajectories as ten consecutive
+  100-sample chunks (seed set once per round, never between chunks), and the
+  300/500/1000 configurations are NESTED PREFIXES of that one 1000-sample draw.
+  Differences among 300/500/1000 therefore isolate the sample-size effect; the
+  100-sample baseline came from a separate earlier draw, so the 100->300 step
+  also carries draw-to-draw noise.
+  All 36 experimental NPZ files (12 rounds x 3 counts) were present and valid:
+  shapes (100, 300/500/1000, 20), the three expected arrays, official asset
+  order, forecast dates matching the round schedule, all values finite, no
+  missing or duplicate rounds.
+  Scored with the primary methodology imported unchanged from
+  scripts/evaluate_m6_rps.py (same return conversion, cross-sectional ranking,
+  tie handling, ground truth, RPS formula and aggregation); DRE untouched.
+  Overall mean RPS (lower is better; naive benchmark 0.160000):
+    100 samples  0.179368   (primary result, read from Results/Evaluation/)
+    300 samples  0.177916   (-0.001452 vs 100)
+    500 samples  0.177947   (-0.001421 vs 100)
+   1000 samples  0.177624   (-0.001744 vs 100)  <- best
+  Best: 1000 samples, 0.001744 better than the 100-sample baseline and better in
+  11 of the 12 rounds. The improvement is real and consistently signed but NOT
+  material: it is about a tenth of the +0.019368 gap to the naive benchmark, and
+  it is essentially exhausted by 300 samples (300->500 +0.000031,
+  500->1000 -0.000323). Within the nested set the total spread is only 0.000323,
+  so the pure sample-size effect is an order of magnitude smaller than the
+  distance to the benchmark. The results clearly stabilise: after 300
+  trajectories the probability estimates are about as well resolved as at 1000.
+  Conclusion: more samples do not fix this model. The gap to the benchmark is a
+  property of the forecasts, not of the sampling resolution. This test is
+  EXPLORATORY and does NOT replace the primary 100-sample result (0.179368),
+  which remains the reported figure for Financial Chronos; 300 samples would be
+  the sensible setting if a future run wants marginally tighter estimates.
+  Artifacts (all inside Testing_What_Works/, nothing written to Results/):
+    Testing_What_Works/evaluate_sample_count_test.py
+    Testing_What_Works/sample_count_test_results.csv
+    Testing_What_Works/sample_count_test_summary.md
+    Testing_What_Works/300-500-1000-sample-outputs-fintext/  (36 raw NPZs)
+    Testing_What_Works/Financial_Chronos_Sample_Count_Test_Chunked.ipynb
+
+Exploratory test 3 — Chronos-T5 Base sample-count sensitivity
+  (PREPARED 2026-08-07; NOT YET EXECUTED — no results exist)
+  The same question as test 2, now asked of Chronos-T5 Base 200M
+  (amazon/chronos-t5-base), whose primary 100-sample result is 0.226899: does
+  drawing more sampled trajectories materially change its M6 RPS? Sample counts
+  to be tested: 300, 500 and 1000, over the same 12 rounds, the same Stage 3
+  contexts (SHA-verified), same 512-day context, same 20-day horizon, same
+  official asset order, same seed 42, same SERIES_BATCH_SIZE 10.
+  Design mirrors test 2 exactly, including the chunked generation forced by GPU
+  memory: each round sets seed 42 ONCE, draws 1000 trajectories as ten
+  consecutive 100-sample chunks without reseeding between them, frees the GPU
+  tensors between chunks, concatenates on the sample axis, and saves the
+  300/500/1000 configurations as NESTED PREFIXES of that single draw.
+  Differences among 300/500/1000 therefore isolate the sample-size effect; the
+  100-sample baseline is a separate earlier run, so 100 -> 1000 is NOT a
+  perfectly controlled nested comparison and must not be described as one.
+  Expected artifacts once run: 36 NPZ files (12 rounds x 3 counts) copied into
+  Testing_What_Works/300-500-1000-sample-outputs-base/, then scored by
+  Testing_What_Works/evaluate_sample_count_test_base.py, which imports discovery,
+  per-file validation and scoring from the test-2 evaluator and the M6
+  methodology from scripts/evaluate_m6_rps.py - no new scorer. It reads the
+  100-sample Base baseline from Results/Evaluation/rps_by_round.csv and
+  cross-checks it against the recorded 0.226899.
+  Prepared files:
+    Testing_What_Works/Chronos_Base_Sample_Count_Test_Chunked.ipynb  (unexecuted)
+    Testing_What_Works/evaluate_sample_count_test_base.py
+    Testing_What_Works/300-500-1000-sample-outputs-base/  (empty, awaiting NPZs)
+  Note: evaluate_sample_count_test.py (test 2) was scoped to search only its own
+  300-500-1000-sample-outputs-fintext folder instead of all of
+  Testing_What_Works/, because both experiments use the same
+  *_round<NN>_samples<N>.npz naming and a repository-wide scan would have found
+  72 files and reported duplicate rounds once the Base outputs arrive. Verified
+  that this changed none of test 2's numbers.
+  Expected runtime: Chronos-T5 Base ran at roughly 45s per round at 100 samples
+  on an L4, so ten chunks per round implies ~7-8 minutes per round and on the
+  order of 1.5 hours for all 12 - long enough that a Colab disconnect is a real
+  risk. Rounds are saved and verified incrementally, so a disconnect costs only
+  the round in progress.
+  NO RESULTS YET: the notebook has not been executed and no Base sample-count
+  RPS values exist. This entry records preparation only.
+
+Exploratory test 3a — reduced Chronos-T5 Base 300/500 variant
+  (PREPARED and EXECUTED 2026-08-07 — results below)
+  ** THIS IS THE VARIANT THAT WAS ACTUALLY RUN. ** Because Chronos-T5
+  Base is slow (~45s per round at 100 samples on an L4), the full 300/500/1000
+  design above needs roughly 1.5 hours of uninterrupted Colab time. This reduced
+  variant drops the 1000-sample configuration, halving the work to about 45
+  minutes, and is otherwise identical to test 3 in every respect: same model
+  (amazon/chronos-t5-base), same 12 rounds, same SHA-verified Stage 3 contexts,
+  same 512-day context, same 20-day horizon, same official asset order, same
+  seed 42, same SERIES_BATCH_SIZE 10, same 100-sample chunking, same GPU cleanup,
+  same validation and save/reload checks, same output format.
+  Generation: each round sets seed 42 ONCE, draws 500 trajectories as FIVE
+  consecutive 100-sample chunks without reseeding between them, concatenates on
+  the sample axis to (100, 500, 20), and saves the 300-sample configuration as a
+  NESTED PREFIX of that same draw plus the full 500. 300 vs 500 is therefore a
+  controlled comparison; 100 vs 300/500 is NOT, because the 100-sample baseline
+  came from a separate earlier run.
+  Files validated before scoring: all 24 NPZ files present in
+  Testing_What_Works/300-500-sample-outputs-base/ (12 rounds x 2 counts), shapes
+  (100, 300, 20) and (100, 500, 20), the three required arrays, official asset
+  order, forecast dates matching the round schedule, all values finite, no
+  missing or duplicate rounds. The nesting was verified directly: in all 12
+  rounds the 300-sample array equals the first 300 columns of the 500-sample
+  array, confirming both configurations come from the same generation.
+  Scored by Testing_What_Works/evaluate_sample_count_test_base.py, which imports
+  discovery, per-file validation and scoring from the test-2 evaluator and the M6
+  methodology from scripts/evaluate_m6_rps.py - no new scorer. Same four-week
+  conversion, cross-sectional ranking, tie handling, official ground truth and
+  RPS. DRE untouched. The 100-sample baseline was read from
+  Results/Evaluation/rps_by_round.csv and cross-checked as 0.226899. Rerunning
+  the evaluator produced byte-identical output.
+
+  RESULTS (lower is better; naive benchmark 0.160000)
+    100 samples  0.226899   (primary result, separate earlier run)
+    300 samples  0.226854   (-0.000045 vs 100)
+    500 samples  0.226920   (+0.000021 vs 100)
+    Controlled 300 -> 500 step (same draw): +0.000066
+    Both configurations remain +0.0669 worse than the naive benchmark.
+
+    Round |  100 samples | 300 samples | 500 samples | 300-100   | 500-100
+      1   |    0.230891  |   0.230669  |   0.230765  | -0.000222 | -0.000126
+      2   |    0.231249  |   0.232902  |   0.232817  | +0.001653 | +0.001568
+      3   |    0.208048  |   0.207879  |   0.207071  | -0.000169 | -0.000977
+      4   |    0.230311  |   0.230176  |   0.229335  | -0.000135 | -0.000976
+      5   |    0.214248  |   0.216833  |   0.217845  | +0.002585 | +0.003597
+      6   |    0.234013  |   0.231594  |   0.232158  | -0.002419 | -0.001855
+      7   |    0.197714  |   0.198449  |   0.199183  | +0.000735 | +0.001469
+      8   |    0.185988  |   0.186696  |   0.186924  | +0.000708 | +0.000936
+      9   |    0.276527  |   0.275741  |   0.275320  | -0.000786 | -0.001207
+     10   |    0.183424  |   0.180836  |   0.181474  | -0.002588 | -0.001950
+     11   |    0.202942  |   0.202742  |   0.202764  | -0.000200 | -0.000178
+     12   |    0.327434  |   0.327730  |   0.327381  | +0.000296 | -0.000053
+    Rounds better than the 100-sample baseline: 300 -> 7/12, 500 -> 8/12.
+    Mean absolute per-round change: 0.001041 for 100->300, 0.000483 for 300->500.
+
+  CONCLUSION: increasing the sample count does NOT materially improve Chronos-T5
+  Base. The whole 100 -> 500 range moves the overall RPS by less than 0.0001,
+  against a +0.0669 gap to the naive benchmark - three orders of magnitude
+  apart. The two directions even disagree (300 marginally better than 100, 500
+  marginally worse), which is the signature of noise rather than of a trend. The
+  cleanest number is the controlled 300 -> 500 step, which shares one generation
+  and moves the score by +0.000066. This is consistent with the Stage 5 sharpness
+  diagnostic: Chronos Base's cross-sectional ordering is already highly stable
+  between samples (dispersion ratio 1.97, mean maximum probability 0.53), so
+  extra trajectories barely move its quintile probabilities. The finding also
+  matches exploratory test 2, where Financial Chronos gained only 0.0017 from
+  100 -> 1000; the effect here is even smaller. Sample count is not what limits
+  either model - the forecasts themselves are.
+
+  Limitation on the comparison: 300 and 500 are nested prefixes of ONE new
+  generation, so the 300 -> 500 step is a controlled sample-size comparison. The
+  100-sample result came from a SEPARATE earlier run with its own random draw,
+  so 100 vs 300/500 mixes sample size with draw-to-draw variation and must not
+  be presented as a controlled nested comparison. With per-round differences of
+  the order of 0.001-0.003 in both directions, no round-level difference here is
+  distinguishable from Monte Carlo noise.
+
+  Files:
+    Testing_What_Works/Chronos_Base_300_500_Sample_Test_Chunked.ipynb
+    Testing_What_Works/300-500-sample-outputs-base/  (24 raw NPZ files)
+    Testing_What_Works/sample_count_test_base_300_500_results.csv
+    Testing_What_Works/sample_count_test_base_300_500_summary.md
+  The evaluator selects whichever Base experiment folder holds files and writes
+  tagged outputs, so the two Base variants cannot overwrite each other. Its
+  discovery helper in evaluate_sample_count_test.py gained an optional
+  expected-counts argument (default unchanged); verified that test 2's numbers
+  are byte-identical afterwards.
+  The test-3 notebook (300/500/1000) remains prepared and unexecuted; given this
+  result there is no strong reason to spend the extra compute on it.
+
+Reproducing this stage
+  python scripts/evaluate_m6_rps.py        (offline, deterministic, ~1 minute)
+  python Testing_What_Works/evaluate_sample_count_test.py   (exploratory test 2)
+  python Testing_What_Works/evaluate_sample_count_test_base.py  (exploratory test 3,
+                                           after the 36 Base NPZs are copied in)
+  python -m pytest tests/test_evaluate_m6_rps.py
+  The script discovers models by scanning Results/*/round_outputs/ for
+  *_round??_samples.npz, so a third model can be evaluated by dropping its
+  round outputs into a new Results/<Model_Name>/round_outputs/ folder — no code
+  change required.
+
+--------------------------------------------------------------------------------
+L. CHRONOS-2 (120M) — ZERO-SHOT INFERENCE STAGE
+   (notebook prepared 2026-08-07; EXECUTED 2026-08-07)
+--------------------------------------------------------------------------------
+
+Status
+  COMPLETE. The notebook was run manually in Google Colab and the 12 raw
+  quantile files are in Results/Chronos_2_120M/round_outputs/ as
+  chronos_2_round01..12_quantiles.npz. Independently revalidated during the
+  post-processing stage: every file holds the four expected arrays, shape
+  (100, 20, 21), the 21 native quantile levels, the 100 official symbols in
+  order, the correct 20 forecast dates, all values finite, and quantiles
+  strictly increasing for every asset and day (no crossing anywhere).
+
+Model
+  amazon/chronos-2, approximately 120M parameters, used ZERO-SHOT — inference
+  only, no training and no fine-tuning. Loaded once per run through the official
+  API, Chronos2Pipeline.from_pretrained("amazon/chronos-2", device_map="cuda"),
+  from chronos-forecasting 2.3.1 (Transformers pinned to a 4.x release;
+  Transformers 5.x is incompatible with this Chronos release).
+
+Inputs — identical to the two completed models
+  The same 12 Stage 3 contexts (round_01..12_context.csv), used unchanged and
+  SHA-256-verified against the repository digests before inference: 100 official
+  M6 assets in official order, 512 weekday daily log returns each, 20-weekday
+  horizon, the same forecast dates. No returns were recalculated and no external
+  standardising, normalising, clipping, smoothing, backfilling or imputation was
+  applied — Chronos-2 performs its own model-native scaling and missing-value
+  handling, so CARR's (round 1) and OGN's (all rounds) genuine leading NaNs are
+  passed to the model untouched. The only alteration is the float64 -> float32
+  dtype cast the tensor requires.
+
+Key methodological difference 1 — multivariate, not univariate
+  Chronos-T5 Base and Financial Chronos are univariate: each asset was forecast
+  independently and batching (10 at a time) was only a speed device. Chronos-2
+  instead receives all 100 return series TOGETHER as ONE multivariate
+  forecasting task shaped (1, 100, 512) = 1 task x 100 target variates x 512
+  observations, so the model can share information across assets. All 100 series
+  are targets; none are covariates. There is no per-asset loop and no series
+  batch size. cross_learning is left False (the API default): it shares
+  information across SEPARATE tasks, and this stage submits exactly one task
+  whose variates are already modelled jointly. This is a genuine design
+  difference from the earlier two models and must be reported as such when the
+  three are compared.
+
+Key methodological difference 2 — quantiles, not sampled trajectories
+  Chronos-2 emits native quantile forecasts rather than sampled paths, so there
+  is no num_samples and no sampling seed governing the output (the seed is still
+  set for reproducibility of any incidental nondeterminism). The quantile levels
+  are READ FROM THE LOADED PIPELINE (pipeline.quantiles) rather than hard-coded;
+  the documented native set is 21 levels: 0.01, 0.05, 0.10, 0.15, ..., 0.90,
+  0.95, 0.99. The notebook asserts the loaded model reports 21 increasing levels
+  and saves whatever levels the model actually reports.
+
+API note (verified against the chronos-forecasting source, not assumed)
+  Chronos2Pipeline.predict(inputs, prediction_length=None, batch_size=256,
+  context_length=None, cross_learning=False, limit_prediction_length=False)
+  accepts a 3-D array of shape (batch, n_variates, history_length) and returns a
+  list[torch.Tensor] whose elements are shaped
+  (n_variates, n_quantiles, prediction_length). The notebook therefore INSPECTS
+  the returned shape and transposes to (assets, days, quantiles) only if needed,
+  rather than assuming a layout; 20 forecast days and 21 quantiles differ in
+  size, so the axes are unambiguous. An unrecognised shape raises.
+
+Planned NPZ structure (one file per round, created only when the notebook runs)
+  <DRIVE_OUTPUT_DIR>/chronos_2_round01..12_quantiles.npz, each containing
+    quantile_forecasts  (100 assets, 20 forecast days, 21 quantiles), float32
+    quantile_levels     the 21 native levels read from the model
+    asset_symbols       100 symbols in official M6 order
+    forecast_dates      the round's 20 forecast weekdays
+  Before saving, each round is checked for the correct shape, 100 assets in
+  official order, 20 correct forecast dates, 21 quantile levels, all values
+  finite, and quantiles ordered monotonically for every asset and day (no
+  crossing, tolerance 1e-6). Every round is saved immediately and then reloaded
+  and re-verified, and section 10 re-checks all 12 files independently from disk.
+
+Repository locations
+  Notebooks/Chronos_2_120M_rounds_1_to_12.ipynb   (prepared, unexecuted)
+  Results/Chronos_2_120M/round_outputs/           (empty; awaiting the 12 NPZs)
+  Results/Chronos_2_120M/reports/                 (empty)
+  The existing Chronos_T5_Base_200M and
+  Financial_Chronos_Small_46M_2021_Global results are untouched.
+
+Scope boundary — deliberately not done
+  This stage stops at the raw quantile forecasts. No M6 post-processing of any
+  kind: no four-week returns, no cross-sectional ranking, no quintiles, no
+  quintile probabilities, no RPS, no DRE adjustment, and explicitly NO
+  conversion of quantiles into sampled trajectories. That conversion is a
+  methodological decision in its own right — the earlier models' Stage 5
+  pipeline consumes sampled trajectories, whereas Chronos-2 produces quantiles,
+  so the two are not interchangeable and the bridge between them will be
+  designed, documented and validated separately after inference.
+
+--------------------------------------------------------------------------------
+M. CHRONOS-2 POST-PROCESSING METHOD 1 — SPATIOTEMPORAL GAUSSIAN COPULA
+   (executed locally 2026-08-07)
+--------------------------------------------------------------------------------
+
+Why post-processing is required
+  Chronos-2 outputs MARGINAL quantiles: for each asset and each of the 20
+  forecast days it gives 21 quantiles of that day's log return, and nothing
+  about how the days or the assets move together. The M6 task needs the
+  opposite: a four-week return (a sum ACROSS the 20 days) ranked CROSS-
+  SECTIONALLY (a comparison ACROSS the 100 assets). Both of those operations
+  depend on joint structure the marginals do not contain. The two earlier models
+  produced sampled trajectories, which carry that structure implicitly; for
+  Chronos-2 it has to be supplied explicitly. This is a methodological addition
+  on top of the model, and results must be attributed to the model AND the
+  chosen coupling, not to the model alone.
+
+Method chosen (the first of possibly several)
+  A separable spatiotemporal Gaussian copula. Chronos-2 supplies the marginals;
+  all dependence comes from the round's own history:
+    latent Z ~ N(0, C_time (x) C_asset)     (Kronecker product => separable)
+    U = Phi(Z), clipped to [0.01, 0.99]
+    scenario return = Chronos-2 marginal quantile curve evaluated at U
+  Implemented in scripts/evaluate_chronos2_spatiotemporal_copula.py (CPU only,
+  no GPU and no model reload).
+
+Marginal curves
+  Each (asset, day) curve is a monotonic piecewise-linear interpolation of the
+  21 native quantiles, so any percentile can be requested. Percentiles outside
+  0.01-0.99 are CLIPPED to those boundaries rather than extrapolated: no tail
+  behaviour beyond what the model actually reported is invented. A cumulative
+  maximum guards against numerical quantile crossing (none was present in the
+  raw files). The raw NPZs are opened read-only and were unchanged.
+
+Cross-asset dependence (100x100), from that round's context only
+  Each asset's observed 512-day log returns are converted to empirical
+  percentile ranks and then to standard-normal scores. Rows are restricted to
+  dates where EVERY asset has a genuine observation: leading missing history is
+  never backfilled, zero-filled or imputed, so those rows are simply not usable
+  for a joint estimate. Usable rows therefore rise with OGN's shrinking gap:
+  210 in round 1 (OGN 302 missing, CARR 1) up to 430 in round 12 (OGN 82). The
+  correlation is estimated with LEDOIT-WOLF shrinkage (sklearn LedoitWolf),
+  converted from covariance to correlation, symmetrised, and checked for
+  positive definiteness. Realised shrinkage fell from 0.0432 (round 1, fewest
+  observations) to 0.0153 (round 12) - small, as expected once n > p. The
+  minimum eigenvalue was comfortably positive in all 12 rounds (0.047 down to
+  0.017), so the eigenvalue-repair path was never needed.
+
+Temporal dependence (20x20)
+  A single pooled lag-one parameter is estimated across assets on the Gaussian
+  score series and used to build corr(i,j) = rho^|i-j|. The estimates are
+  essentially zero in every round: rho ranged from -0.0179 (round 1) to +0.0137
+  (round 9), median about +0.005. It was deliberately NOT floored away from
+  zero, so the time correlation matrix is very close to the identity. In
+  practice this method is therefore almost purely SPATIAL: daily M6 log returns
+  show no usable lag-one structure, and the "temporal" half of the copula
+  contributes almost nothing. That is a finding, not a defect.
+
+Scenario generation
+  Z = L_asset @ G @ L_time' with G iid standard normal gives unit marginal
+  variances and the intended Kronecker covariance. 1,000 scenarios per round,
+  numpy default_rng seeded with 42 at the start of every round, so each round is
+  independently reproducible. Output shape (100 assets, 1000 scenarios, 20 days).
+  These are DERIVED COPULA SCENARIOS, NOT NATIVE CHRONOS-2 SAMPLES: only the
+  marginals come from the model, and every cross-asset and cross-day relation is
+  imposed here from history. They must never be described as model samples.
+
+Conversion to M6 probabilities and RPS — existing methodology reused
+  The (100, 1000, 20) scenario array is passed straight into the primary
+  evaluator's own functions (scripts/evaluate_m6_rps.py): four-week return
+  exp(sum of 20 log returns) - 1, cross-sectional ranking of all 100 assets per
+  scenario, the official tie-aware quintile rule, averaging membership across
+  scenarios, and the official RPS against the same assets_m6.csv ground truth.
+  No separate scorer was written. Verified per round: probability rows sum to 1
+  (max deviation 2e-16) and lie in [0, 1]; each quintile receives exactly 20
+  units of cross-sectional mass; asset ordering preserved; 1,200 asset-round
+  scores; mean of the 12 round means equals the mean of the 1,200 scores.
+
+Results (lower is better)
+  Overall mean RPS: 0.165418        (naive benchmark 0.160000, +0.005418)
+  Round:   1  0.195303      7  0.171117
+           2  0.167976      8  0.156544
+           3  0.160341      9  0.157027
+           4  0.165295     10  0.170070
+           5  0.159533     11  0.149713
+           6  0.144711     12  0.187384
+  Beats the naive benchmark in 5 of the 12 rounds (5, 6, 8, 9, 11); round 6
+  (0.1447) is the best single round produced by any model so far.
+  Comparison:
+    Naive equal-probability benchmark        0.160000
+    Chronos-2 + spatiotemporal copula        0.165418
+    Financial Chronos Small 46M              0.179368
+    Chronos T5 Base 200M                     0.226899
+  Chronos-2 with this post-processing is far ahead of both earlier models
+  (0.014 better than Financial Chronos, 0.061 better than Chronos Base) and much
+  closer to the benchmark, but still does not beat it.
+
+Validation performed
+  All 12 raw NPZs present and valid before use; contexts asserted to end exactly
+  on each round's forecast origin with no later date, so NO FUTURE DATA can
+  enter either dependence matrix (dependence is estimated only from the 512-day
+  context, and the Chronos-2 marginals were produced from that same context);
+  raw NPZ SHA-256 hashes identical before and after the run; naive benchmark
+  recomputed through the evaluator as exactly 0.160000; the whole script rerun
+  end-to-end producing byte-identical CSVs, confirming reproducibility at seed
+  42. Focused pytest suite tests/test_chronos2_copula.py: 9 tests covering the
+  marginal inverse-CDF and its clipping, crossing repair, the AR(1) matrix, the
+  lag-one estimator (recovers a known rho, stays near zero on white noise),
+  exclusion of leading gaps rather than imputation, Ledoit-Wolf validity and
+  positive definiteness, and that the generated scenarios actually reproduce the
+  target asset and time correlations and are seed-deterministic. All pass.
+
+Limitations
+  - The result measures the model PLUS this coupling choice. It is not directly
+    comparable with the two sampled-trajectory models as a pure model
+    comparison, and a different copula could change it.
+  - The estimated temporal dependence is essentially zero, so the method is
+    effectively spatial; the AR(1) component is close to the identity and is
+    carrying almost no information.
+  - Dependence uses complete-case rows only, so early rounds rest on fewer
+    observations (210 in round 1) purely because OGN listed in May 2021. Round 1
+    is also the worst round (0.1953), which is consistent with, though not proof
+    of, a weaker dependence estimate there.
+  - A Gaussian copula has no tail dependence: joint extreme moves across assets
+    are under-represented relative to real markets.
+  - Dependence is assumed constant over the 20-day horizon and estimated from
+    the trailing 512 days, so it cannot react to a regime change inside the
+    forecast window.
+  - 1,000 scenarios resolve each probability to 0.001; Monte Carlo error is
+    small relative to the differences reported here but not zero.
+
+Files produced (all inside the existing Results/Chronos_2_120M/)
+  chronos2_spatiotemporal_copula_quintile_probabilities.csv  1,200 rows: model,
+                                              round, symbol, Rank1..Rank5, RPS
+  chronos2_spatiotemporal_copula_rps.csv      12 round means + overall, with the
+                                              naive benchmark and the difference
+  chronos2_spatiotemporal_copula_diagnostics.csv  per round: usable historical
+                                              rows, assets with leading gaps,
+                                              temporal rho, Ledoit-Wolf
+                                              shrinkage, min eigenvalue before
+                                              and after repair
+  scripts/evaluate_chronos2_spatiotemporal_copula.py
+  tests/test_chronos2_copula.py
+  The 1,000 scenarios per round are NOT saved: the raw quantiles, the seed and
+  this script regenerate them exactly.
+
+Reproducing
+  python scripts/evaluate_chronos2_spatiotemporal_copula.py   (~30s, CPU only)
+  python -m pytest tests/test_chronos2_copula.py
+
+--------------------------------------------------------------------------------
+N. CHRONOS-2 POST-PROCESSING METHOD 2 — INDEPENDENT QUANTILE SAMPLING
+   (executed locally 2026-08-07)
+--------------------------------------------------------------------------------
+
+Why this was tested
+  Method 1 (section M) scored 0.165418 by wrapping Chronos-2's marginal
+  quantiles in a spatiotemporal Gaussian copula. That result confounds two
+  things: the quality of Chronos-2's marginals, and the value of the dependence
+  structure imposed on top of them. This experiment is the ABLATION that
+  separates them. It is a comparison/sensitivity method, not a competing
+  headline result: it exists to answer whether the dependence modelling
+  materially improved Chronos-2's M6 performance.
+
+The single change
+  Every percentile is sampled INDEPENDENTLY for every (asset, scenario,
+  forecast day). There is no cross-asset correlation matrix, no Ledoit-Wolf
+  estimation, no temporal rho, no AR(1) time matrix and no Gaussian copula; no
+  historical dependence is fitted at all, so the round's Stage 3 context is not
+  even read. This is the simplest possible quantile-to-scenario conversion.
+
+Everything else held identical (verified, not assumed)
+  Same 12 raw Chronos-2 NPZs and the same validation; the same monotone
+  piecewise-linear interpolation of the 21 native quantiles; the same clipping
+  of percentiles to 0.01-0.99 with no invented tails; 1,000 scenarios; seed 42;
+  the same four-week aggregation exp(sum of 20 log returns) - 1; the same
+  cross-sectional ranking, tie handling, ground truth and RPS scorer. The
+  script IMPORTS those functions from the method-1 script and from
+  scripts/evaluate_m6_rps.py rather than copying them, and asserts at runtime
+  that N_SCENARIOS and RANDOM_SEED match method 1, so the two experiments
+  cannot silently drift apart. A test also asserts the two modules share the
+  same interpolation and loading functions by identity. No difference other
+  than the percentile dependence mechanism was found.
+
+Nature of the generated data
+  The (100 assets, 1000 scenarios, 20 days) array holds INDEPENDENTLY SAMPLED
+  SCENARIOS DERIVED FROM CHRONOS-2 MARGINAL QUANTILE FORECASTS. They are NOT
+  native Chronos-2 trajectories: only the marginals come from the model, and
+  here nothing whatsoever links one asset, day or scenario to another.
+
+Results (lower is better)
+  Overall mean RPS: 0.165559     (copula 0.165418, difference +0.000141)
+  Round:   1  0.192415      7  0.171792
+           2  0.168987      8  0.162146
+           3  0.159132      9  0.160128
+           4  0.167611     10  0.168075
+           5  0.160434     11  0.146553
+           6  0.149747     12  0.179684
+  Full comparison:
+    Naive equal-probability benchmark        0.160000
+    Chronos-2 + spatiotemporal copula        0.165418
+    Chronos-2 + independent sampling         0.165559
+    Financial Chronos Small 46M              0.179368
+    Chronos T5 Base 200M                     0.226899
+  Independent sampling beats the copula in 5 of 12 rounds (1, 3, 10, 11, 12) and
+  loses in 7; it beats the naive benchmark in 3 of 12 rounds (6, 3 marginally,
+  11) versus the copula's 5. Both Chronos-2 variants remain far ahead of
+  Financial Chronos (-0.014) and Chronos Base (-0.061).
+
+Did dependence modelling materially help? No.
+  The entire spatiotemporal copula apparatus - complete-case Gaussian scores,
+  Ledoit-Wolf shrunk 100x100 correlation, AR(1) time matrix, Kronecker copula -
+  bought 0.000141 of overall RPS, about 0.09% relative, and it does not win a
+  majority of rounds by a convincing margin (7 of 12). On this evidence
+  Chronos-2's M6 performance comes from the quality of its MARGINAL quantile
+  forecasts, not from the joint structure imposed afterwards.
+  Two mechanisms explain this, and both were visible in method 1:
+  (a) the estimated temporal dependence was already ~0 (rho between -0.018 and
+      +0.014), so the copula's time component was effectively the identity and
+      only its cross-asset component could ever have mattered;
+  (b) M6 scores a CROSS-SECTIONAL ranking, and positive cross-asset correlation
+      largely acts as a common market factor that shifts all 100 assets
+      together - ranking removes exactly that component, so it cannot change
+      the quintile assignment much.
+  Important nuance: the two methods do NOT produce the same forecasts. Comparing
+  the 1,200 asset-round probability vectors gives a mean absolute difference of
+  0.0395 per cell, a mean total-variation distance of 0.099, a correlation of
+  0.763, and the same modal quintile in only 718 of 1,200 cases. Sharpness is
+  almost identical (mean maximum probability 0.3117 copula vs 0.3127
+  independent). So the dependence structure meaningfully RESHUFFLES which asset
+  receives which probability, but does not make those probabilities any better.
+  That is a stronger statement than "the methods agree", and it is the more
+  useful finding for the write-up.
+
+Validation performed
+  All 12 raw NPZs present and valid before use; raw NPZ SHA-256 hashes identical
+  before and after the run; probability rows sum to 1 and lie in [0, 1]; each
+  quintile receives exactly 20 units of cross-sectional mass in every round;
+  official asset ordering preserved; 1,200 asset-round scores with the mean of
+  the 12 round means equal to the mean of all 1,200; naive benchmark recomputed
+  through the evaluator as exactly 0.160000. Focused pytest suite
+  tests/test_chronos2_independent_sampling.py: 10 tests, all passing, covering
+  independence through time for one asset, across assets and across scenarios
+  (all |correlations| < 0.06), the absence of any reused or broadcast draw, the
+  ~2% of draws that legitimately collapse onto the clip boundaries, uniform
+  marginals, correct mapping through non-identity curves, seed-42 determinism,
+  and equality of the shared settings with method 1. Full suite: 47 tests pass.
+
+Limitations
+  - This is an ablation of one coupling choice, not proof that dependence is
+    irrelevant in general: a copula with tail dependence, or a non-separable or
+    time-varying structure, could behave differently.
+  - 1,000 scenarios resolve each probability to 0.001, and the copula-versus-
+    independent gap (0.000141) is smaller than the Monte Carlo noise one would
+    expect from a different seed, so the two should be read as TIED rather than
+    as the copula being narrowly ahead.
+  - Both variants still fail to beat the naive 0.160000 benchmark overall.
+
+Files produced (inside the existing Results/Chronos_2_120M/, nothing overwritten)
+  chronos2_independent_sampling_quintile_probabilities.csv  1,200 rows: model,
+                                              round, symbol, Rank1..Rank5, RPS
+  chronos2_independent_sampling_rps.csv       12 round means + overall, each with
+                                              the copula result, the naive
+                                              benchmark and both differences
+  scripts/evaluate_chronos2_independent_sampling.py
+  tests/test_chronos2_independent_sampling.py
+  The 1,000 scenarios per round are NOT saved: the raw quantiles, seed 42 and
+  this script regenerate them exactly. The method-1 copula outputs and the raw
+  Chronos-2 NPZs were left untouched.
+
+Reproducing
+  python scripts/evaluate_chronos2_independent_sampling.py   (~14s, CPU only)
+  python -m pytest tests/test_chronos2_independent_sampling.py
 
 ================================================================================
 END OF CURRENT RECORD — append future stages below this line's section style.

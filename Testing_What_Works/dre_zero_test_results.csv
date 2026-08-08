@@ -1,0 +1,27 @@
+scope,model,round,dre_zeroed_this_round,original_rps,dre_adjusted_rps,difference,dre_asset_original_rps,dre_asset_adjusted_rps
+overall,Chronos T5 Base 200M,,,0.22689897,0.22701713,0.00011817,,
+overall,Financial Chronos Small 46M 2021 Global,,,0.17936823,0.17939767,2.943e-05,,
+round,Chronos T5 Base 200M,1,no,0.2308908,0.2308908,0.0,0.14002,0.14002
+round,Chronos T5 Base 200M,2,no,0.2312492,0.2312492,0.0,0.24858,0.24858
+round,Chronos T5 Base 200M,3,no,0.208048,0.208048,0.0,0.07372,0.07372
+round,Chronos T5 Base 200M,4,no,0.2303108,0.2303108,0.0,0.3538,0.3538
+round,Chronos T5 Base 200M,5,no,0.2142476,0.2142476,0.0,0.11804,0.11804
+round,Chronos T5 Base 200M,6,no,0.2340132,0.2340132,0.0,0.0561,0.0561
+round,Chronos T5 Base 200M,7,no,0.1977136,0.1977136,0.0,0.38116,0.38116
+round,Chronos T5 Base 200M,8,no,0.185988,0.185988,0.0,0.1091,0.1091
+round,Chronos T5 Base 200M,9,yes,0.2765268,0.2779164,0.0013896,0.48354,0.60338
+round,Chronos T5 Base 200M,10,yes,0.1834236,0.1834464,2.28e-05,0.38818,0.39208
+round,Chronos T5 Base 200M,11,yes,0.202942,0.202942,0.0,0.20032,0.20032
+round,Chronos T5 Base 200M,12,yes,0.327434,0.3274396,5.6e-06,0.4245,0.42178
+round,Financial Chronos Small 46M 2021 Global,1,no,0.1573572,0.1573572,0.0,0.2255,0.2255
+round,Financial Chronos Small 46M 2021 Global,2,no,0.157182,0.157182,0.0,0.18044,0.18044
+round,Financial Chronos Small 46M 2021 Global,3,no,0.1824732,0.1824732,0.0,0.1743,0.1743
+round,Financial Chronos Small 46M 2021 Global,4,no,0.1770372,0.1770372,0.0,0.25924,0.25924
+round,Financial Chronos Small 46M 2021 Global,5,no,0.1927732,0.1927732,0.0,0.25058,0.25058
+round,Financial Chronos Small 46M 2021 Global,6,no,0.1909688,0.1909688,0.0,0.0622,0.0622
+round,Financial Chronos Small 46M 2021 Global,7,no,0.2153048,0.2153048,0.0,0.17522,0.17522
+round,Financial Chronos Small 46M 2021 Global,8,no,0.1861388,0.1861388,0.0,0.1102,0.1102
+round,Financial Chronos Small 46M 2021 Global,9,yes,0.177572,0.1776984,0.0001264,0.38168,0.39602
+round,Financial Chronos Small 46M 2021 Global,10,yes,0.1685636,0.1685708,7.2e-06,0.01688,0.01922
+round,Financial Chronos Small 46M 2021 Global,11,yes,0.1733732,0.1735324,0.0001592,0.17716,0.18818
+round,Financial Chronos Small 46M 2021 Global,12,yes,0.1736748,0.1737352,6.04e-05,0.00254,0.00128
