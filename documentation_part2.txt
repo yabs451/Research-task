@@ -1,0 +1,471 @@
+================================================================================
+M6 RESEARCH PROJECT — DOCUMENTATION, PART 2
+Direct continuation of documentation.txt, which remains the authoritative record
+for Stages 1-5 (data acquisition through the M6 RPS evaluation of the three
+time-series foundation models) and for the exploratory tests under
+Testing_What_Works/. Part 2 begins with the introduction of conventional
+competition-grade machine-learning baselines.
+================================================================================
+
+--------------------------------------------------------------------------------
+P. RESEARCH PURPOSE — WHY COMPETITION-GRADE BASELINES ARE BEING ADDED
+--------------------------------------------------------------------------------
+
+Where the project stands
+  Stages 1-5 established the data pipeline, the 12 M6 rolling-origin contexts,
+  raw inference for three time-series foundation models (TSFMs) and a single,
+  shared M6 quintile/RPS evaluator. The headline results were:
+
+    Naive equal-probability benchmark        0.160000
+    Chronos-2 120M + spatiotemporal copula   0.165418
+    Chronos-2 120M + independent sampling    0.165559
+    Financial Chronos Small 46M              0.179368
+    Chronos T5 Base 200M                     0.226899
+
+  Every TSFM tested is beaten by a forecast that assigns 0.2 to each quintile.
+  That is an informative result, but on its own it cannot distinguish between
+  two very different explanations: (a) the M6 ranking task is close to
+  unpredictable at this horizon, so nothing much beats the uniform forecast, or
+  (b) the TSFMs specifically are poorly suited to it, while conventional
+  feature-based learners do better.
+
+Why baselines resolve this
+  A competition-grade supervised baseline that was actually built for the M6
+  ranking task provides the missing reference point. If well-tuned LightGBM and
+  Random Forest models also fail to beat 0.16, that is evidence for (a) - a
+  statement about the task. If they beat it, that is evidence for (b) - a
+  statement about the TSFMs, and a much stronger contribution: it would show
+  that zero-shot foundation models underperform purpose-built feature-based
+  models on cross-sectional financial ranking.
+
+Methodological reference: Samartzis
+  The primary reference is Panagiotis Samartzis, "Predicting the Relative
+  Performance among Financial Assets: A Comparative Analysis of Different
+  Approaches" (International Journal of Forecasting), with the accompanying
+  implementation placed in this repository under `Relevant Context/`:
+    Generate_forecasts.py    data preparation, feature construction, the
+                             tuning/forecast loop and the model registry
+    all_models.py            the model wrappers (LGBM, RF and many others)
+    Calculate_metrics.py     evaluation metrics
+    RPS and IR calculation.py  the official M6 scorer
+    Data_M6.xlsx             the data template (sheets: Tickers, Close, Open,
+                             High, Low, Volume) - a structure template, not
+                             populated data
+    Universe_M6.xlsx         the 100-asset M6 universe
+  Samartzis is directly relevant because he addresses exactly this task (M6
+  quintile probabilities over the same 100 assets) with feature-based learners,
+  and his LGBM and RF configurations are competition-grade rather than toy
+  baselines.
+
+This is an adaptation, not a reproduction
+  We are re-implementing SELECTED Samartzis baselines (initially LightGBM and
+  Random Forest) INSIDE this project's existing methodology and evaluation
+  framework. Concretely that means:
+    - the core modelling ideas and engineered predictors are preserved where
+      they are appropriate to our design;
+    - implementation details are adapted where necessary so the baselines
+      remain directly comparable with the TSFM results already produced -
+      above all, they must be scored by the SAME evaluator
+      (scripts/evaluate_m6_rps.py), against the SAME ground truth built from
+      Data/assets_m6.csv, over the SAME 12 official M6 rounds;
+    - preprocessing decisions from the original repository are NOT copied
+      simply because they are there. Several of them (forward/backward fill,
+      KNN imputation, ECOD outlier replacement, winsorising) conflict with the
+      deliberate "no fabricated observations" stance taken in Stages 1-3 of
+      this project, and each will be evaluated on its merits and documented
+      as adopted, modified or rejected.
+  When the modelling stage is implemented, the documentation must state for
+  each component whether it came from Samartzis unchanged, was modified, or was
+  designed for this project - and why.
+
+Scope of the current stage
+  RAW DATA ACQUISITION ONLY. No preprocessing, feature engineering, labelling,
+  training, tuning, forecasting or evaluation has been performed.
+
+--------------------------------------------------------------------------------
+Q. DATASET D — COMPETITION BASELINE OHLCV DATA (RAW ACQUISITION)
+   (executed 2026-08-08)
+--------------------------------------------------------------------------------
+
+Why a separate dataset was needed
+  None of the existing datasets can serve the feature-based baselines:
+    Dataset A (Yahoo + EODHD repairs, adjusted close only, 2020-01-01 onward)
+      is too short for features that look back ~11 months before a 2010
+      training row, and carries only one field.
+    Dataset C (EODHD adjusted close, 2012-03-05 .. 2022-03-04) was collected
+      for possible TSFM fine-tuning. It is adjusted-close only and starts too
+      late, so it cannot support Open/High/Low/Volume features or a 2010 start.
+    The processed panels, rolling-origin contexts, model outputs and evaluation
+      outputs are all downstream artifacts of Dataset A and are not raw inputs.
+  Dataset D is therefore a new RAW dataset, kept entirely separate from all of
+  the above. Nothing in Dataset A, Dataset C, the processed data, the rolling
+  contexts, the model outputs, the evaluation results or the exploratory
+  Testing_What_Works/ outputs was modified by this stage.
+
+Relationship to the other datasets
+  Dataset D overlaps Dataset A in time (2020-2023) and Dataset C in time
+  (2012-2022), but it is an independent download with a wider field set. The
+  overlap with Dataset A is used ONLY as an identity check - to confirm that the
+  security retrieved under each EODHD identifier is the intended M6 asset. No
+  Dataset A or Dataset C value is ever copied into Dataset D, and no Dataset D
+  gap is patched from them.
+
+Universe
+  Exactly the 100 official M6 assets already used throughout the project, taken
+  from the project's own authoritative ordering (the column order of
+  Data/processed/rolling_origins/round_01_context.csv) rather than reconstructed
+  independently. Verified: the retrieved universe equals that list exactly.
+  Cross-check against the reference material: Samartzis's Universe_M6.xlsx
+  contains the same 100 assets with one naming difference - he lists EG where
+  this project uses the canonical M6 ticker RE. That is independent
+  corroboration of the RE -> EG mapping this project validated in Stage 1B.
+
+Provider
+  EODHD only, through the project's existing secure configuration: the token is
+  read from the git-ignored local env file, and is never printed, written into
+  code, saved into any output, included in documentation or committed. All
+  provider error text is redacted before being raised (verified in practice
+  during this stage - a network failure surfaced the URL with the token shown as
+  ***REDACTED***). Before any bulk download the script confirms the env file is
+  untracked by git and covered by .gitignore.
+
+Requested date range
+  2009-01-01 through 2023-02-03 inclusive. The end date is the final M6
+  evaluation date, matching both this project's round schedule and Samartzis's
+  own M6 sample (`end_oos_date = '2023-02-03'` in Generate_forecasts.py).
+
+--------------------------------------------------------------------------------
+R. THE 2009 WARM-UP HISTORY — WHY THE RANGE STARTS BEFORE THE MODELLING SAMPLE
+--------------------------------------------------------------------------------
+
+The intended modelling sample begins in 2010, consistent with the Samartzis
+feature-based implementation. The 2009 observations exist purely so that the
+lagged and rolling predictors are DEFINED for the earliest 2010 training rows.
+They are feature-construction history: they are not training observations, not
+an additional evaluation period, and they change nothing about the M6
+experiment, whose 12 rounds remain exactly as established in Stage 3
+(origins 2022-03-04 .. 2023-01-06, evaluation ending 2023-02-03).
+
+The binding constraint is `feat_6` in Generate_forecasts.py:
+
+    feat_6 = monthly_returns.shift(20*11)
+
+`monthly_returns` is itself a four-week (20 business day) return, and it is then
+shifted back 20 x 11 = 220 business days. A row dated t therefore depends on
+price information reaching back roughly 220 + 20 = 240 business days - about
+eleven to twelve calendar months. Several other predictors add their own
+lookback on top of a 20-day shift:
+
+    feat_1 = returns_df.rolling(60).std().shift(20)      60 + 20  =  80 days
+    feat_2 = returns_df.rolling(60).max().shift(20)      60 + 20  =  80 days
+    feat_3 = log(volume * close / 1000).rolling(40).sum().shift(20)
+                                                          40 + 20  =  60 days
+    feat_4 = (|returns| / feat_3).rolling(60).sum().shift(20)
+                                                          up to 120 days
+    feat_5 = quarterly_returns.shift(20)                  60 + 20  =  80 days
+    feat_6 = monthly_returns.shift(20*11)                220 + 20  = 240 days
+
+So the deepest requirement is ~240 business days before the first modelling
+observation. For a training row in early January 2010 that reaches back into
+roughly January-February 2009. Requesting from 2009-01-01 provides that warm-up
+with a small margin.
+
+Consequences to respect in the next stage
+  - Rows before roughly 2010 must be dropped from the TRAINING sample rather
+    than kept with partially-defined features.
+  - Assets that listed after 2009 will have `feat_6` undefined for their first
+    ~240 business days. That is genuine missing information, not a data error,
+    and the handling of it is a modelling decision to be documented then.
+  - Nothing about the 2009 data licenses any change to the evaluation window.
+
+--------------------------------------------------------------------------------
+S. RETRIEVED FIELDS AND WHY EACH IS KEPT
+--------------------------------------------------------------------------------
+
+For every asset-date EODHD supplies, Dataset D stores the raw values of:
+
+  date            trading date as reported by the provider
+  open            used by Samartzis for two predictors: the intraday
+                  open-to-close move, `open_close = (close - open) / open`, and
+                  the overnight gap, `open_close_gap = (open - close[t-1]) /
+                  close[t-1]`. Both capture short-horizon price pressure that a
+                  close-only series cannot express.
+  high, low       used for the intraday range proxy,
+                  `high_low = (high - low) / close`, a simple realised-volatility
+                  measure that does not require a long estimation window.
+  close           the raw (unadjusted) closing price. This is what Samartzis's
+                  template supplies and what his features consume, including the
+                  dollar-volume term inside `feat_3`.
+  adjusted_close  NOT used by Samartzis (his Data_M6.xlsx has no adjusted-close
+                  sheet). It is retained here as a deliberate adaptation,
+                  because the rest of this project - Dataset A, the Stage 2 log
+                  returns, the rolling contexts and every TSFM result - is built
+                  on adjusted close. Keeping both fields means the next stage can
+                  decide, and document, whether the baselines' return
+                  construction should follow Samartzis (raw close) or this
+                  project's existing convention (adjusted close), without another
+                  download. See the KR data-quality note in section T before
+                  making that choice.
+  volume          used directly in `feat_3` (a 40-day rolling sum of log dollar
+                  volume, a liquidity/size proxy), in `feat_4` (an Amihud-style
+                  illiquidity ratio of absolute return to dollar volume) and in
+                  the raw volume change `vol_change = volume.pct_change(1)`.
+
+Retained exactly as supplied. No returns of any kind were computed into the
+stored dataset, no field was rescaled, and no derived column was added beyond
+the two provenance columns (`symbol`, `eodhd_identifier`) that make the long
+format self-describing.
+
+--------------------------------------------------------------------------------
+T. ACQUISITION RESULT, IDENTIFIERS AND DATA-QUALITY FINDINGS
+--------------------------------------------------------------------------------
+
+Outcome
+  100 of 100 assets retrieved successfully; no asset failed, none was dropped
+  and none was substituted. 315,042 asset-date rows spanning 2009-01-02 (the
+  first trading day on or after the requested 2009-01-01) to 2023-02-03. All six
+  price/volume fields are present with no missing values in any retrieved row.
+
+Subscription and API behaviour
+  The subscription was verified before any bulk download (active monthly plan,
+  100,000 requests/day, ~36 used at the time), and the historical EOD endpoint
+  was probed AT the 2009 start date specifically to confirm that history reaches
+  that far back rather than assuming it.
+  A transient network outage did occur: for roughly ten minutes eodhd.com was
+  unreachable from this machine (DNS resolved, TCP connections timed out) and
+  three successive attempts failed before the first asset was downloaded. This
+  was not a subscription problem - the same token had completed 100 downloads
+  for Dataset C shortly before, and connectivity returned by itself. In response
+  the shared client gained a proportional retry (4 attempts with a 15/30/45s
+  backoff, network errors only; HTTP status errors are not retried). The
+  acquisition then completed in one pass.
+
+EODHD identifier mappings (11 of 100 do not map to <TICKER>.US)
+  RE -> EG.US
+      Everest Re Group was renamed Everest Group; EODHD serves the history under
+      the post-rename code. The naive RE.US would be a DIFFERENT security. This
+      mapping was validated in Stage 1B against the official M6 price file and
+      is reused here, and is independently corroborated by Samartzis's universe
+      file listing EG.
+  DRE -> DRE.US, WRK -> WRK.US
+      Also confirmed in Stage 1B; both resolve directly despite being delisted
+      or merged after the competition.
+  Ten London-listed ETFs map .L -> .LSE:
+      HIGH.L, IEAA.L, IEFM.L, IEVL.L, IUMO.L, IUVL.L, JPEA.L, MVEU.L, SEGA.L,
+      SPMV.L
+  The remaining 89 tickers resolved as <TICKER>.US on the first attempt,
+  including the hyphenated BF-B -> BF-B.US. (Note that Samartzis renames this
+  asset to BF.B for his provider; our provider does not require that.)
+  The resolver tries candidates in order and records every identifier attempted.
+  If all candidates fail the asset is recorded as failed - it is never silently
+  replaced with a similar-looking security.
+
+Identity verification
+  Each retrieved series was checked against Dataset A over their overlap by
+  comparing daily returns (correlation and median absolute difference). 99 of
+  100 assets matched cleanly. Dataset A was used only as a reference; it never
+  contributed a value to Dataset D.
+
+DATA-QUALITY FINDING — KR adjusted_close has a break on 2022-10-21
+  KR (Kroger) was flagged by the identity check with an adjusted-close return
+  correlation of 0.944 against Dataset A, below the 0.98 threshold. Investigation
+  shows the identifier is CORRECT and the raw prices are sound - it is the
+  provider's adjustment factor that is broken:
+
+    date        close    adjusted_close   adj/close
+    2022-10-17  42.11    32.2524          0.7659
+    2022-10-20  42.17    32.2983          0.7659
+    2022-10-21  43.63    39.8974          0.9144   <-- factor jumps 19.4%
+    2022-10-24  43.99    40.2266          0.9144
+
+  The adjustment ratio is constant either side of 2022-10-21 and steps
+  discontinuously on that date, manufacturing a spurious +23.5% one-day return
+  in adjusted_close where the true move was about +3.5%. Kroger's raw close
+  series is clean: its returns correlate 0.9995 with Dataset A.
+  A scan of all 100 assets found only two with any daily adjusted-close return
+  disagreement above 1% versus Dataset A - KR (one day, 20.1%) and COP (two
+  days, max 1.5%, consistent with ordinary dividend-timing differences between
+  providers rather than a break).
+  Why this matters for the next stage: 2022-10-21 falls inside M6 Round 9
+  (forecast window 2022-10-17 .. 2022-11-11). If the baselines construct returns
+  from Dataset D's adjusted_close, KR would carry a fabricated 23.5% move inside
+  a scored round. Samartzis's own features use raw close, which is unaffected.
+  This must be resolved explicitly before preprocessing - the options are to use
+  raw close (following Samartzis, and unaffected), to use adjusted close with a
+  documented correction for this single break, or to source the adjustment from
+  another dataset. No correction has been applied here, because this stage is
+  acquisition only and the raw provider output is preserved as received.
+  Note that this does NOT affect any existing result: the M6 evaluation targets
+  are built from Data/assets_m6.csv, and the TSFM inputs come from Dataset A.
+
+Assets with shorter genuine histories (27 of 100)
+  Retained exactly as supplied; no pre-inception period was backfilled,
+  interpolated or proxied by another asset.
+    SEGA.L 2009-06-04, VRSK 2009-10-07, DG 2009-11-13, CHTR 2010-01-05,
+    MCHI 2011-03-31, INDA 2012-02-03, META 2012-05-18, IEMG 2012-10-22,
+    ABBV 2012-12-10, MVEU.L 2012-12-11, SPMV.L 2013-01-03, CDW 2013-06-27,
+    ALLE 2013-11-18, REET 2014-07-10, IEVL.L 2015-01-19, IEFM.L 2015-01-19,
+    PYPL 2015-07-06, FTV 2016-06-13, IUVL.L 2016-10-17, IUMO.L 2016-11-03,
+    JPEA.L 2017-04-13, IEAA.L 2017-09-25, HIGH.L 2017-09-25, VXX 2018-01-18,
+    XLC 2018-06-19, CARR 2020-03-19, OGN 2021-05-14
+  These are genuine listing dates (IPOs, spin-offs and ETF launches). The two
+  most extreme, CARR (726 rows) and OGN (435 rows), will have very little
+  pre-M6 training history and no `feat_6` for most of it - a modelling
+  constraint to address and document in the next stage, not a download failure.
+
+Genuine end-of-history (1 of 100)
+  DRE ends 2022-10-03 (3,462 rows), its true final trading day before the Duke
+  Realty acquisition. The series simply stops; nothing was extended or padded.
+  This is consistent with the treatment established in Stage 2, where DRE's
+  post-acquisition M6 competition return is fixed at zero - a rule that belongs
+  to the competition-specific evaluation layer, not to raw acquisition.
+
+Provider limitations noted
+  - Adjusted closes are recomputed retrospectively by providers, so a future
+    re-download may differ slightly; the KR break above is a concrete example of
+    the resulting fragility.
+  - Dataset D is single-provider (EODHD), whereas Dataset A is Yahoo with EODHD
+    repairs. The two are therefore not value-identical even where they overlap;
+    the identity check confirms the same securities, not identical numbers.
+  - The universe is the fixed M6 competition list, so it carries that list's
+    survivorship characteristics.
+
+--------------------------------------------------------------------------------
+U. VALIDATION PERFORMED
+--------------------------------------------------------------------------------
+
+  - The intended universe contains exactly 100 assets and the retrieved symbol
+    set equals the project's authoritative M6 list.
+  - Every retrieved security passed the Dataset A identity check except KR,
+    which was investigated in full and explained above (correct security,
+    provider adjustment break).
+  - All six requested fields are present for every retrieved row, with no
+    missing values.
+  - No observation is later than 2023-02-03; none is earlier than 2009-01-01;
+    the earliest actual observation is 2009-01-02, the first trading day in
+    range.
+  - Later inception dates and DRE's delisting are preserved as genuine history.
+  - All identifiers actually used, and every identifier attempted, are recorded
+    per asset in the status file.
+  - Nothing existing was overwritten: Dataset A, Dataset C, the processed data,
+    the rolling contexts, all model outputs and all evaluation results are
+    unchanged (git reports only the new Dataset D files, the new script and the
+    two documentation files).
+
+Deliberately NOT done (elaborate validation was avoided as unnecessary here)
+  No SHA-256 hashing of outputs, no per-asset report files, no test suite for
+  the downloader. The acquisition is verified by the checks above, and the
+  status file records provenance.
+
+--------------------------------------------------------------------------------
+V. METHODOLOGICAL BOUNDARY OF THIS STAGE
+--------------------------------------------------------------------------------
+
+This stage performed RAW ACQUISITION ONLY. It did NOT perform, and the next
+stage must decide and document each of:
+
+  - construction of a shared Monday-Friday calendar or any business-day
+    resampling;
+  - forward filling, backward filling, KNN imputation or interpolation of any
+    missing observation;
+  - simple return or log return construction;
+  - winsorising, ECOD or any other outlier detection or replacement;
+  - four-week or quarterly return construction;
+  - construction of any Samartzis predictor (feat_0 ... feat_6, high_low,
+    open_close, open_close_gap, vol_change);
+  - target/label construction or the mapping of forward returns to M6 quintiles;
+  - assembly of supervised training rows;
+  - definition of the pre-M6 tuning rounds;
+  - LightGBM or Random Forest training;
+  - HyperOpt or any other hyperparameter tuning;
+  - forecast generation;
+  - RPS evaluation.
+
+--------------------------------------------------------------------------------
+W. FILES CREATED OR MODIFIED IN THIS STAGE
+--------------------------------------------------------------------------------
+
+Created
+  scripts/download_dataset_d_eodhd.py
+      Dataset D acquisition. Imports the EODHD client, token loading,
+      secret-safety checks, subscription verification, identifier resolution and
+      the official universe from scripts/download_dataset_c_eodhd.py rather than
+      duplicating that infrastructure; adds only what is specific to Dataset D
+      (the 2009-2023 range, the OHLCV field set, the long-format consolidation
+      and the resume logic).
+  data/raw/dataset_d_eodhd/dataset_d_ohlcv.csv
+      The consolidated raw dataset. Long format, one row per asset-date, columns:
+      symbol, eodhd_identifier, date, open, high, low, close, adjusted_close,
+      volume. 315,042 rows, ~20 MB. Long format was chosen over a wide layout
+      because six fields x 100 assets does not fit one wide CSV cleanly, and it
+      keeps the provider identifier attached to every observation. This single
+      file is sufficient to rebuild all later preprocessing and features without
+      another API download.
+  data/raw/dataset_d_eodhd/dataset_d_status.csv
+      Per-asset provenance: official M6 ticker, EODHD identifier used, every
+      identifier attempted, status, observation count, first and last available
+      date, the Dataset A identity-check verdict with its correlation and
+      overlap size, and notes.
+  documentation_part2.txt
+      This file.
+
+Modified
+  scripts/download_dataset_c_eodhd.py
+      Two backwards-compatible extensions so the Dataset C acquisition utility
+      could be reused rather than duplicated:
+        (1) verify_subscription() gained optional `from_date`/`probe_to`
+            parameters (defaults unchanged, so Dataset C behaviour is
+            identical) allowing Dataset D to probe at its own 2009 start date;
+        (2) the HTTP client gained a proportional retry for transient network
+            errors (4 attempts, 15/30/45s backoff), added in response to the
+            real outage described in section T. HTTP status errors are not
+            retried, and a persistent failure still raises so the caller stops
+            safely with progress preserved.
+      No Dataset C output was regenerated or altered.
+
+Reproducing or resuming
+  python scripts/download_dataset_d_eodhd.py
+      Re-running skips assets already recorded as retrieved in the status file
+      and appends only what is missing, so an interrupted run resumes cheaply.
+      --refresh forces a full re-download; --limit N processes only the first N
+      assets (for smoke testing). The consolidated CSV and the status file are
+      rewritten after every asset, so an interruption cannot lose completed
+      work, and rows belonging to an asset not marked complete are discarded on
+      resume rather than being trusted.
+
+--------------------------------------------------------------------------------
+X. DOCUMENTATION STANDARD REQUIRED FOR THE NEXT STAGE
+--------------------------------------------------------------------------------
+
+The modelling stage must be documented here at a substantially greater level of
+detail than a list of feature names. Recorded now so the standard is fixed
+before implementation, and deliberately NOT pre-filled with content that does
+not yet exist.
+
+For every engineered predictor, document:
+  - its formula and exact construction;
+  - the raw inputs it consumes;
+  - the historical window or lag applied;
+  - an intuitive explanation of what it measures;
+  - why it might carry predictive information for cross-sectional ranking;
+  - how Samartzis used it;
+  - whether our implementation reproduces or modifies that definition, and why
+    any modification was made;
+  - how missing observations are handled.
+
+Also document in detail:
+  - how future four-week returns are constructed;
+  - how those returns become M6 quintile labels;
+  - what exactly one supervised training row represents (asset, date, features,
+    label);
+  - how the pre-M6 tuning periods are defined and why;
+  - how HyperOpt selects hyperparameters using RPS;
+  - how the expanding or rolling training procedure works;
+  - how the official 12 M6 rounds stay aligned with the existing TSFM
+    evaluation, so the comparison remains like-for-like;
+  - how final LightGBM and Random Forest quintile probabilities and RPS values
+    are produced, and how they are scored by the same shared evaluator.
+
+================================================================================
+END OF PART 2 — append future stages below this line's section style.
+================================================================================

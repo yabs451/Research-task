@@ -1570,6 +1570,104 @@ Reproducing
   python scripts/evaluate_chronos2_independent_sampling.py   (~14s, CPU only)
   python -m pytest tests/test_chronos2_independent_sampling.py
 
+--------------------------------------------------------------------------------
+O. DATASET C — PRE-M6 ADAPTATION DATA (RAW ACQUISITION ONLY)
+   (executed 2026-08-08)
+--------------------------------------------------------------------------------
+
+Purpose
+  Raw historical prices collected for POSSIBLE FUTURE fine-tuning/adaptation
+  experiments. Nothing has been done with it yet: no fine-tuning, no return
+  calculation, no context or training-example construction, no preprocessing of
+  any kind. This entry records acquisition only.
+
+Design
+  Universe: exactly the same 100 official M6 assets, stored in the official M6
+  order. Provider: EODHD only. Requested range: 2012-03-05 to 2022-03-04
+  inclusive - the end date is deliberately the FIRST M6 forecast origin, so
+  Dataset C cannot overlap the competition evaluation period. The intended
+  downstream field is adjusted_close. Assets that listed later keep only their
+  genuine history from inception; nothing was backfilled or fabricated.
+
+Acquisition result
+  Subscription verified before any bulk download (type=monthly, ~100,000
+  requests/day, ample headroom) and the EOD endpoint was probed at the 2012
+  start date to confirm history reaches that far back. All 100/100 assets were
+  retrieved successfully; no asset failed, none was silently dropped and none
+  was substituted. 2,568 union trading dates, 2012-03-05 to 2022-03-04, with
+  observation counts from 204 (OGN) to 2,518 (full US history).
+
+Identifier handling (11 assets do NOT map to <TICKER>.US)
+  RE -> EG.US, reusing the validated Stage 1B mapping (Everest Re was renamed
+  Everest Group); the naive RE.US would have been the wrong security. DRE and
+  WRK confirmed as DRE.US and WRK.US, also from Stage 1B. The ten London-listed
+  ETFs map .L -> .LSE: HIGH.L, IEAA.L, IEFM.L, IEVL.L, IUMO.L, IUVL.L, JPEA.L,
+  MVEU.L, SEGA.L, SPMV.L. Every other ticker resolved as <TICKER>.US first try.
+
+Identity validation against Dataset A
+  Each downloaded series was checked against Dataset A over the 2020-2022
+  overlap (daily-return correlation and median absolute return difference,
+  computed in memory for validation only). All 100 assets returned "match";
+  the weakest correlation was 0.9993 (SEGA.L) and median absolute return
+  differences were ~0. Dataset A was used ONLY as a cross-check - no Dataset A
+  value was ever copied into Dataset C, and no gap was patched from it.
+
+Shorter genuine histories (21 assets, all explained by inception dates)
+  OGN 2021-05-14 (204 obs), CARR 2020-03-19 (495), XLC 2018-06-19 (935),
+  VXX 2018-01-18 (1,040), IUMO.L 2016-11-03 (1,070), HIGH.L 2017-09-25 (1,122),
+  IEAA.L 2017-09-25 (1,124), JPEA.L 2017-04-13 (1,236), IUVL.L 2016-10-17
+  (1,362), FTV 2016-06-13 (1,440), PYPL 2015-07-06 (1,680), IEVL.L 2015-01-19
+  (1,803), IEFM.L 2015-01-19 (1,804), REET 2014-07-10 (1,922), ALLE 2013-11-18
+  (2,088), MVEU.L 2012-12-11 (2,135), CDW 2013-06-27 (2,188), SEGA.L 2012-03-06
+  (2,269), SPMV.L 2013-01-03 (2,283), ABBV 2012-12-10 (2,325), IEMG 2012-10-22
+  (2,357), META 2012-05-18 (2,465). These are genuine listing dates (IPOs and
+  spin-offs), not download failures.
+
+Blank cells in the consolidated CSV are calendar differences, not gaps
+  The CSV uses the UNION of the US and UK trading calendars, so a US asset is
+  blank on the 50 dates when the LSE traded and US markets were closed (e.g.
+  Thanksgiving, 4 July, Presidents' Day) and the UK ETFs are blank on the 240
+  US-only dates. Verified: every date carries at least one quote, and every
+  post-inception blank for a US asset falls on a US-closed date. No date is
+  empty for the whole universe. These blanks are left exactly as they are -
+  aligning calendars is a later preprocessing decision, as it was for Dataset A
+  in Stage 2.
+
+Files produced (all new; nothing existing was read-modified or overwritten)
+  scripts/download_dataset_c_eodhd.py            acquisition script; resumable,
+                                                 token never printed or stored
+  data/raw/dataset_c_eodhd/raw_responses/*.json  100 preserved raw responses
+                                                 with token-free provenance
+                                                 (identifier, endpoint, params,
+                                                 retrieval timestamp)
+  data/raw/dataset_c_eodhd/dataset_c_adjusted_close.csv
+                                                 2,568 dates x 100 assets in
+                                                 official M6 order
+  data/raw/dataset_c_eodhd/dataset_c_acquisition_manifest.csv
+                                                 per-asset identifier, status,
+                                                 observation count, date range
+                                                 and overlap-validation result
+
+Explicitly not done
+  No returns, no 512-day contexts, no forward/backward filling, interpolation,
+  standardisation, normalisation or clipping, and no use of M6-period or
+  Dataset A data to fill anything. Dataset A, the processed panels, the rolling
+  contexts, all model outputs and all evaluation results are untouched.
+
+Limitations
+  - Single provider: Dataset C is EODHD-only, whereas Dataset A is Yahoo with
+    EODHD repairs, so the two are not byte-comparable even where they overlap;
+    the overlap check confirms the same securities, not identical values.
+  - Adjusted closes are provider- and time-dependent (dividend/split
+    adjustments are applied retrospectively), so a future re-download may differ
+    slightly. The raw responses are archived to preserve exactly what was used.
+  - The 100 assets are the M6 universe as constituted for the competition, so
+    the dataset carries survivorship characteristics of that fixed list.
+
+Reproducing
+  python scripts/download_dataset_c_eodhd.py            (resumes; --refresh to
+                                                         force re-download)
+
 ================================================================================
 END OF CURRENT RECORD — append future stages below this line's section style.
 ================================================================================
