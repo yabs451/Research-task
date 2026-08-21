@@ -312,3 +312,294 @@ Runtime
 ================================================================================
 END OF STAGE 8 - HELD-OUT M6 EVALUATION.
 ================================================================================
+
+--------------------------------------------------------------------------------
+H. THE FEATURE-BASED MODEL FAMILY - ACADEMIC JUSTIFICATION
+--------------------------------------------------------------------------------
+
+The three feature-based classifiers in this project form an M6 benchmark adapted
+from the feature-based classification methodology of Samartzis (2025). They are
+NOT an exact reproduction of that work: the predictors, the future four-week
+quintile target, the forecast-origin alignment, the causal training rules and
+the two preprocessing branches are this project's own finalized decisions
+(documentation_part2.txt, sections AD-AT), while the model families, their
+hyperparameter search spaces and the cross-sectional probability
+post-processing are preserved from the source.
+
+The three were chosen to span distinct hypothesis classes rather than to
+accumulate models:
+
+  RANDOM FOREST
+    A nonlinear bagging-based tree ensemble. It provides a robust feature-based
+    classifier and tests whether nonlinear interactions between financial
+    predictors contribute useful relative-performance information.
+
+  LIGHTGBM
+    A nonlinear gradient-boosted tree ensemble. Its inclusion provides a
+    distinct ensemble-learning mechanism from Random Forest and enables
+    comparison of boosting against bagging.
+
+  SOFTMAX REGRESSION
+    A low-complexity and interpretable linear multiclass classifier that
+    directly produces five-quintile probability forecasts. It tests whether the
+    predictive signal captured by the feature-based models requires nonlinear
+    tree ensembles or can largely be represented by a much simpler linear
+    decision structure.
+
+--------------------------------------------------------------------------------
+I. STAGE 9 - SOFTMAX REGRESSION: TUNING AND HELD-OUT M6 EVALUATION
+   (executed 2026-08-21)
+--------------------------------------------------------------------------------
+
+Why Softmax, and why now
+  Stage 8 established that the tree ensembles beat the naive benchmark by about
+  0.003 RPS. That leaves open whether the edge comes from nonlinear structure or
+  from a much simpler linear relationship between the ten predictors and the
+  cross-sectional quintile. Softmax answers that directly: same predictors, same
+  target, same origins, same causal rules, same probability post-processing -
+  only the decision structure changes, from tree ensembles to a linear
+  multiclass boundary.
+
+Input branch
+  The finalized KNN supervised dataset, `supervised_rows_knn.csv`, used
+  READ-ONLY. It was chosen because 8 of its 10 predictors are already complete,
+  so the amount of extra handling Softmax needs is minimal.
+
+Residual missing values, and why imputation was required here
+  In the KNN branch the only remaining NaNs are in the two volume-derived
+  features - they arise from the Samartzis zero-volume rule (section AR of
+  Part 2) and are irreducible by KNN, which only ever touched the return matrix:
+
+    feature                        NaN cells   affected rows
+    feat_dollar_volume_2m              382     -
+    feat_abs_ret_to_volume_3m          521     -
+    other eight predictors               0     -
+    TOTAL                              903     493 of 14,163 historical (3.48%)
+                                               28 of 1,200 M6 rows   (2.33%)
+
+  Random Forest and LightGBM consume these natively. scikit-learn's
+  LogisticRegression cannot: it raises `ValueError: Input X contains NaN` at
+  fit time, in this version and for both branches. Softmax therefore requires a
+  missing-value decision that the tree models did not, and it cannot be avoided
+  by branch choice - the affected assets (SEGA.L, IEFM.L, HIGH.L, DRE) appear in
+  all 12 M6 rounds and in 28 rows that must be forecast.
+
+Causal training-median imputation (Softmax only)
+  At every origin T, in this order:
+    1. select the causally eligible training rows (`eligible_for_training_from
+       <= T`, the same rule as RF/LGBM);
+    2. compute the median of each of the ten predictors using ONLY those
+       training rows;
+    3. fill missing values in BOTH the training rows and the prediction rows at
+       T with those TRAINING medians.
+  Justification: the median is the minimal, distribution-free choice for a
+  handful of missing cells; it is refitted at every origin so it uses no future
+  information; and applying the training median to the prediction rows keeps the
+  prediction block strictly out of the fitted statistics. Medians are never
+  computed globally. If a required training median cannot be formed the run
+  stops rather than inventing another rule (implemented and unit-tested; it did
+  not trigger).
+  In practice only the two volume features ever required filling, at every
+  origin, exactly as anticipated: 813-903 cells per origin, 10,494 cells in
+  total across the 12 M6 rounds.
+
+Causal standardization
+  The Samartzis paper states that scale-sensitive models are normalized by
+  subtracting the training mean and dividing by the training standard deviation.
+  The released `logistic_model` does not itself show such a scaler - the only
+  StandardScaler in all_models.py belongs to `mlp_model` - so for this
+  scale-sensitive model the project follows the PAPER's stated methodology
+  rather than the released code, and records this as a deliberate deviation.
+  At every origin a StandardScaler is fitted on the imputed TRAINING predictors
+  only, then used to transform both the training and the prediction blocks. It
+  is never fitted on prediction rows or future data.
+
+  Full pipeline order, refitted from scratch at every origin:
+    causal training selection -> median imputation -> standardization
+    -> Softmax fit -> prediction -> 0.20 adjustment -> validation.
+
+  VERIFIED at two origins by independent re-derivation: training blocks are
+  centred (|mean| <= 2.8e-16) and unit-scaled (|sd-1| <= 1.1e-16); prediction
+  blocks are NOT centred on themselves (|mean| ~ 0.46), proving the scaler was
+  fitted on training rows alone; training medians differ from a global median on
+  6 of 10 features, proving they are not global; and corrupting every row dated
+  after T leaves both design matrices bit-identical.
+
+Nothing was persisted
+  The finalized KNN CSV was not modified and no median-filled copy of it exists.
+  Imputation and scaling happen inside the Softmax pipeline at each origin and
+  are discarded afterwards. Confirmed by SHA-256: `supervised_rows_knn.csv` is
+  byte-identical before and after this stage.
+
+Model
+  `sklearn.linear_model.LogisticRegression(random_state=42, C=<tuned>,
+  max_iter=100)` - the released configuration plus the paper's scaler. Default
+  lbfgs solver, multinomial for a 5-class target. Ten predictors, no AssetClass,
+  no change to any feature or target definition. Probabilities come directly
+  from `predict_proba`, mapped onto the fixed quintile columns (column j =
+  quintile j = Rank j+1, quintile 0 = worst realised return). Convergence was
+  comfortable throughout: at most 24 lbfgs iterations against a limit of 100.
+
+Probability post-processing
+  The released cross-sectional adjustment, unchanged: `adjusted = raw +
+  (0.2 - column_mean)`. No clipping, no renormalisation. Validity requires every
+  entry in [0, 1] and every row summing to 1 within 1e-9, and the same
+  infeasible-candidate principle established for RF/LGBM applies.
+
+Tuning
+  Search space, confirmed directly against the released registry before running:
+  `'C': hp.uniform('C', 0.5, 1.0)` - a single tuned hyperparameter. The released
+  rule MAX_EVALS = 20 x |space| therefore gives exactly 20 TPE evaluations. The
+  same 12 pre-M6 tuning origins as RF/LGBM (2021-03-05 .. 2022-01-07), the same
+  expanding causal training history (12,866 -> 13,963 rows), seed 42, objective
+  = mean RPS over the 12 origins against the KNN branch's own historical target.
+
+    evaluations completed        20 of 20 (budget exhausted, none replaced)
+    infeasible candidates         0 (0.0%)
+    selected C                    0.94113380
+    mean pre-M6 tuning RPS        0.156583
+    per-origin tuning RPS         0.15664, 0.15305, 0.15679, 0.15449, 0.15800,
+                                  0.15725, 0.15481, 0.15722, 0.15697, 0.16060,
+                                  0.15455, 0.15863
+    probability range             0.038489 .. 0.491494, row-sum error 5.6e-16
+    tuning runtime                1.05 minutes
+
+  Note the selected C = 0.941 sits near the upper edge of the released
+  Uniform(0.5, 1.0) interval, i.e. toward weaker regularisation. The space was
+  not widened, because the released search space is preserved deliberately.
+
+Held-out M6 evaluation
+  C was frozen at 0.94113380 and written to disk BEFORE evaluation began. At
+  each of the 12 official M6 origins the imputer, the scaler and the model were
+  all refitted from scratch on the expanded causally eligible history
+  (14,163 -> 15,263 rows), all 100 assets were forecast, the 0.20 adjustment was
+  applied and validated, and only then was the official ground truth loaded and
+  the project's existing evaluator used to score.
+
+    Round   Origin        Softmax RPS
+      1     2022-03-04      0.154855
+      2     2022-04-01      0.164212
+      3     2022-04-29      0.159100
+      4     2022-05-27      0.158105
+      5     2022-06-24      0.154636
+      6     2022-07-22      0.153120
+      7     2022-08-19      0.159087
+      8     2022-09-16      0.160543
+      9     2022-10-14      0.155829
+     10     2022-11-11      0.161112
+     11     2022-12-09      0.153359
+     12     2023-01-06      0.154307
+    ------------------------------------
+     MEAN M6 RPS             0.157355     (vs naive 0.160000: -0.002645)
+
+  Beats the naive benchmark in 9 of 12 rounds. Round 2 is the worst round, as it
+  was for all three tree configurations. Tuning-to-held-out degradation is
+  +0.000772, the smallest of any model in the project - consistent with a
+  low-variance linear model having less to overfit.
+
+Probability validity
+  NO invalid probabilities occurred, in tuning or in evaluation. Across all 20
+  tuning candidates and all 12 M6 rounds every adjusted probability stayed
+  inside [0, 1] (M6 range 0.043665 .. 0.504505) with a maximum row-sum error of
+  6.7e-16. Softmax never triggered the stop rule that halted LGBM/knn in Stage 8;
+  its flatter, less confident cross-sections leave far more headroom before the
+  additive 0.20 shift can cross a bound.
+
+Comparison
+
+| Model                                   | Mean M6 RPS | vs naive  |
+|---|---:|---:|
+| RF / no_knn                             | 0.157053 | -0.002947 |
+| RF / knn                                | 0.157149 | -0.002851 |
+| SOFTMAX / knn                           | 0.157355 | -0.002645 |
+| LGBM / no_knn                           | 0.157432 | -0.002568 |
+| Naive equal-probability benchmark       | 0.160000 |  0.000000 |
+| Chronos-2 120M + spatiotemporal copula  | 0.165418 | +0.005418 |
+| Chronos-2 120M + independent sampling   | 0.165559 | +0.005559 |
+| Financial Chronos Small 46M             | 0.179368 | +0.019368 |
+| Chronos T5 Base 200M                    | 0.226899 | +0.066899 |
+| LGBM / knn                              | stopped  | invalid probability, round 11 |
+
+  (TSFM and naive figures quoted from Part 2 section P; not recomputed or
+  altered by this stage.)
+
+Interpretation
+  Softmax lands squarely inside the tree-ensemble band: 0.157355 against RF's
+  0.157053-0.157149 and LightGBM's 0.157432. The entire spread across the four
+  completed feature-based models is 0.00038 RPS, an order of magnitude smaller
+  than their common ~0.0029 margin over the naive benchmark.
+
+  The natural reading is that the predictive content in these ten features is
+  largely LINEAR in the cross-section: a plain multinomial logistic regression
+  recovers essentially all of the edge that bagged and boosted tree ensembles
+  find, and it beats one of them. The tree ensembles' nonlinear capacity is not
+  buying meaningful additional relative-performance information here. That
+  strengthens rather than weakens the Stage 8 conclusion - the edge over the
+  naive benchmark is small but is not an artifact of one model family's
+  inductive bias, since three structurally different learners agree on it.
+
+  Two cautions. The differences between the four models are far too small to
+  rank them meaningfully on 12 rounds. And Softmax's advantage in robustness -
+  no invalid probabilities, smallest tuning-to-held-out degradation - is a
+  property worth noting alongside its accuracy, not a claim that it forecasts
+  better.
+
+Files created in this stage
+  scripts/softmax_feature_baseline.py
+      The whole stage: causal median imputation and standardization, the Softmax
+      model, HyperOpt/TPE tuning of C over the 12 pre-M6 origins, C freezing, and
+      the held-out M6 evaluation scored by the project's existing official
+      evaluator.
+  tests/test_softmax_feature_baseline.py
+      9 tests covering only what is new here: that just the two volume features
+      need filling; that medians come from training rows and not the whole
+      dataset; that prediction rows are filled with TRAINING medians; that the
+      scaler is training-fitted; that neither statistic can see post-origin data;
+      that a missing training median stops the run; probability validity; the
+      released search space and budget; and consistency of the written artifacts.
+  Data/metadata/softmax_tuning_results.csv
+      One row: selected C, mean tuning RPS, the 12 per-origin values, budget and
+      infeasible counts, imputation/standardization descriptions, probability
+      range, convergence, seed, versions, timing.
+  Results/Evaluation/softmax_m6_predictions.csv
+      1,200 rows = 12 rounds x 100 assets. Columns: model, variant, round,
+      origin_date, symbol, Rank1..Rank5.
+  Results/Evaluation/softmax_m6_rps.csv
+      One row: frozen C, status, the 12 round RPS values, mean_m6_rps, vs_naive,
+      training-row range, cells imputed, probability range, runtime.
+  logs/softmax_feature_baseline.log
+      Retained run log for this stage.
+
+Files modified
+  documentation_part3.txt (this section and section H). Nothing else. The
+  finalized RF/LGBM result files were NOT touched - Softmax has its own result
+  files rather than being appended to theirs.
+
+Validation performed
+  - `supervised_rows_knn.csv` unchanged (SHA-256 before/after), along with the
+    no-KNN dataset, the RF/LGBM tuning and M6 result files,
+    `model_comparison_rps.csv`, `Data/assets_m6.csv`,
+    `scripts/evaluate_m6_rps.py`, `scripts/tune_feature_baselines.py` and
+    `scripts/evaluate_feature_baselines_m6.py` - all 10 byte-identical.
+  - Median imputation and standardization fitted from training rows only at
+    every origin, verified by independent re-derivation and by a post-origin
+    corruption test.
+  - Ten correct predictors, no AssetClass, unchanged future four-week target.
+  - The 12 pre-M6 tuning origins and the 12 official M6 origins are exactly the
+    established ones.
+  - C frozen and written to disk before M6 evaluation; the evaluation record's
+    C equals the tuning winner.
+  - No M6 outcome entered tuning: the ground truth is loaded only after all 12
+    rounds are forecast.
+  - Rank1..Rank5 ordering correct; 100 assets in every round, matching the
+    official truth's asset set exactly; all probabilities finite, within [0, 1]
+    and summing to 1.
+  - Full project test suite: 90 tests pass.
+
+Runtime
+  1 minute 12 seconds in total - tuning 1.05 minutes (20 evaluations x 12
+  origins), M6 evaluation 0.06 minutes (12 refits). No execution issues.
+
+================================================================================
+END OF STAGE 9 - SOFTMAX REGRESSION.
+================================================================================

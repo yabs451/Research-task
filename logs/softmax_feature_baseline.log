@@ -1,0 +1,60 @@
+2026-08-21 23:33:11,539 INFO softmax_feature_baseline: Tuning softmax/knn: C ~ Uniform(0.5, 1.0), budget 20 evaluations over 12 pre-M6 origins
+2026-08-21 23:33:11,548 INFO hyperopt.tpe: build_posterior_wrapper took 0.000000 seconds
+2026-08-21 23:33:11,548 INFO hyperopt.tpe: TPE using 0 trials
+2026-08-21 23:33:14,888 INFO hyperopt.tpe: build_posterior_wrapper took 0.002016 seconds
+2026-08-21 23:33:14,888 INFO hyperopt.tpe: TPE using 1/1 trials with best loss 0.156583
+2026-08-21 23:33:18,043 INFO hyperopt.tpe: build_posterior_wrapper took 0.002712 seconds
+2026-08-21 23:33:18,044 INFO hyperopt.tpe: TPE using 2/2 trials with best loss 0.156583
+2026-08-21 23:33:21,250 INFO hyperopt.tpe: build_posterior_wrapper took 0.000000 seconds
+2026-08-21 23:33:21,250 INFO hyperopt.tpe: TPE using 3/3 trials with best loss 0.156583
+2026-08-21 23:33:24,328 INFO hyperopt.tpe: build_posterior_wrapper took 0.000000 seconds
+2026-08-21 23:33:24,328 INFO hyperopt.tpe: TPE using 4/4 trials with best loss 0.156583
+2026-08-21 23:33:27,514 INFO hyperopt.tpe: build_posterior_wrapper took 0.002013 seconds
+2026-08-21 23:33:27,514 INFO hyperopt.tpe: TPE using 5/5 trials with best loss 0.156583
+2026-08-21 23:33:30,731 INFO hyperopt.tpe: build_posterior_wrapper took 0.000000 seconds
+2026-08-21 23:33:30,733 INFO hyperopt.tpe: TPE using 6/6 trials with best loss 0.156583
+2026-08-21 23:33:33,865 INFO hyperopt.tpe: build_posterior_wrapper took 0.000000 seconds
+2026-08-21 23:33:33,871 INFO hyperopt.tpe: TPE using 7/7 trials with best loss 0.156583
+2026-08-21 23:33:37,035 INFO hyperopt.tpe: build_posterior_wrapper took 0.000000 seconds
+2026-08-21 23:33:37,035 INFO hyperopt.tpe: TPE using 8/8 trials with best loss 0.156583
+2026-08-21 23:33:40,175 INFO hyperopt.tpe: build_posterior_wrapper took 0.007207 seconds
+2026-08-21 23:33:40,176 INFO hyperopt.tpe: TPE using 9/9 trials with best loss 0.156583
+2026-08-21 23:33:43,275 INFO hyperopt.tpe: build_posterior_wrapper took 0.000000 seconds
+2026-08-21 23:33:43,275 INFO hyperopt.tpe: TPE using 10/10 trials with best loss 0.156583
+2026-08-21 23:33:46,368 INFO hyperopt.tpe: build_posterior_wrapper took 0.000000 seconds
+2026-08-21 23:33:46,368 INFO hyperopt.tpe: TPE using 11/11 trials with best loss 0.156583
+2026-08-21 23:33:49,342 INFO hyperopt.tpe: build_posterior_wrapper took 0.003800 seconds
+2026-08-21 23:33:49,342 INFO hyperopt.tpe: TPE using 12/12 trials with best loss 0.156583
+2026-08-21 23:33:52,260 INFO hyperopt.tpe: build_posterior_wrapper took 0.005188 seconds
+2026-08-21 23:33:52,260 INFO hyperopt.tpe: TPE using 13/13 trials with best loss 0.156583
+2026-08-21 23:33:55,171 INFO hyperopt.tpe: build_posterior_wrapper took 0.000000 seconds
+2026-08-21 23:33:55,177 INFO hyperopt.tpe: TPE using 14/14 trials with best loss 0.156583
+2026-08-21 23:33:58,171 INFO hyperopt.tpe: build_posterior_wrapper took 0.008270 seconds
+2026-08-21 23:33:58,171 INFO hyperopt.tpe: TPE using 15/15 trials with best loss 0.156583
+2026-08-21 23:34:01,176 INFO hyperopt.tpe: build_posterior_wrapper took 0.000000 seconds
+2026-08-21 23:34:01,176 INFO hyperopt.tpe: TPE using 16/16 trials with best loss 0.156583
+2026-08-21 23:34:04,452 INFO hyperopt.tpe: build_posterior_wrapper took 0.000000 seconds
+2026-08-21 23:34:04,452 INFO hyperopt.tpe: TPE using 17/17 trials with best loss 0.156583
+2026-08-21 23:34:07,853 INFO hyperopt.tpe: build_posterior_wrapper took 0.000000 seconds
+2026-08-21 23:34:07,853 INFO hyperopt.tpe: TPE using 18/18 trials with best loss 0.156583
+2026-08-21 23:34:11,106 INFO hyperopt.tpe: build_posterior_wrapper took 0.000000 seconds
+2026-08-21 23:34:11,106 INFO hyperopt.tpe: TPE using 19/19 trials with best loss 0.156583
+2026-08-21 23:34:14,295 INFO softmax_feature_baseline: softmax: best C=0.94113380 mean tuning RPS 0.156583 after 20 evaluations (0 infeasible) in 1.05 min
+2026-08-21 23:34:14,309 INFO softmax_feature_baseline: Wrote C:\Users\13327\OneDrive\Desktop\Research 2nd try\Research-task\Data\metadata\softmax_tuning_results.csv
+2026-08-21 23:34:14,316 INFO softmax_feature_baseline: C frozen at 0.94113380; beginning held-out M6 evaluation.
+2026-08-21 23:34:14,611 INFO softmax_feature_baseline: softmax round  1 (2022-03-04): trained on 14163 rows (855 cells imputed), forecast 100 assets, lbfgs 22 iters
+2026-08-21 23:34:14,910 INFO softmax_feature_baseline: softmax round  2 (2022-04-01): trained on 14263 rows (857 cells imputed), forecast 100 assets, lbfgs 22 iters
+2026-08-21 23:34:15,190 INFO softmax_feature_baseline: softmax round  3 (2022-04-29): trained on 14363 rows (859 cells imputed), forecast 100 assets, lbfgs 22 iters
+2026-08-21 23:34:15,455 INFO softmax_feature_baseline: softmax round  4 (2022-05-27): trained on 14463 rows (861 cells imputed), forecast 100 assets, lbfgs 22 iters
+2026-08-21 23:34:15,727 INFO softmax_feature_baseline: softmax round  5 (2022-06-24): trained on 14563 rows (865 cells imputed), forecast 100 assets, lbfgs 22 iters
+2026-08-21 23:34:16,008 INFO softmax_feature_baseline: softmax round  6 (2022-07-22): trained on 14663 rows (869 cells imputed), forecast 100 assets, lbfgs 22 iters
+2026-08-21 23:34:16,286 INFO softmax_feature_baseline: softmax round  7 (2022-08-19): trained on 14763 rows (874 cells imputed), forecast 100 assets, lbfgs 23 iters
+2026-08-21 23:34:16,575 INFO softmax_feature_baseline: softmax round  8 (2022-09-16): trained on 14863 rows (879 cells imputed), forecast 100 assets, lbfgs 22 iters
+2026-08-21 23:34:16,911 INFO softmax_feature_baseline: softmax round  9 (2022-10-14): trained on 14963 rows (885 cells imputed), forecast 100 assets, lbfgs 23 iters
+2026-08-21 23:34:17,209 INFO softmax_feature_baseline: softmax round 10 (2022-11-11): trained on 15063 rows (890 cells imputed), forecast 100 assets, lbfgs 23 iters
+2026-08-21 23:34:17,497 INFO softmax_feature_baseline: softmax round 11 (2022-12-09): trained on 15163 rows (897 cells imputed), forecast 100 assets, lbfgs 22 iters
+2026-08-21 23:34:17,795 INFO softmax_feature_baseline: softmax round 12 (2023-01-06): trained on 15263 rows (903 cells imputed), forecast 100 assets, lbfgs 22 iters
+2026-08-21 23:34:17,806 INFO softmax_feature_baseline: Forecasting finished; now loading the official M6 ground truth.
+2026-08-21 23:34:18,561 INFO softmax_feature_baseline: Wrote C:\Users\13327\OneDrive\Desktop\Research 2nd try\Research-task\Results\Evaluation\softmax_m6_predictions.csv
+2026-08-21 23:34:18,561 INFO softmax_feature_baseline: softmax: mean M6 RPS 0.157355 (naive 0.160000, difference -0.002645)
+2026-08-21 23:34:18,574 INFO softmax_feature_baseline: Wrote C:\Users\13327\OneDrive\Desktop\Research 2nd try\Research-task\Results\Evaluation\softmax_m6_rps.csv
