@@ -1838,3 +1838,253 @@ Files changed by this correction
 ================================================================================
 END OF STAGE 6 CORRECTION
 ================================================================================
+
+--------------------------------------------------------------------------------
+AS. PROBABILITY-VALIDITY DIAGNOSTIC AND THE INFEASIBLE-CANDIDATE RULE
+    (2026-08-21)
+--------------------------------------------------------------------------------
+
+Why this was investigated
+  The released implementation post-processes every RF/LGBM forecast with
+
+      results[["Rank1".."Rank5"]] += 0.2 - results[["Rank1".."Rank5"]].mean()
+
+  `.mean()` there is a per-COLUMN mean, so each quintile column is shifted until
+  its cross-sectional average is exactly 0.20. Because the five column means of
+  a valid probability matrix sum to 1, the five shifts sum to 0 and every row
+  still sums to 1 exactly. What the rule does NOT do is enforce the [0, 1]
+  bounds on individual entries: it is an unbounded additive shift, so a column
+  whose mean sits well away from 0.20 while its spread is wide can push a tail
+  entry below 0 or above 1.
+
+  With the source's own default hyperparameters all four configurations were
+  clean (worst minimum +0.0059). The problem only appeared once HyperOpt began
+  exploring the search space, so it was quantified before any tuning was run.
+
+Diagnostic design (read-only; no artifact was kept)
+  Real HyperOpt/TPE search, real 12 pre-M6 tuning origins, seed 42, every other
+  methodological decision held fixed. Candidate budgets differ only because RF
+  evaluations cost up to ~180 s each: 25 candidates per LightGBM configuration,
+  12 per Random Forest configuration.
+
+| Metric | RF no-KNN | RF KNN | LGBM no-KNN | LGBM KNN |
+|---|---:|---:|---:|---:|
+| Candidates checked | 12 | 12 | 25 | 25 |
+| Candidates with >=1 invalid probability | 1 | 2 | 11 | 12 |
+| % of candidates affected | 8.3% | 16.7% | 44.0% | 48.0% |
+| Origin forecasts affected | 3 / 144 | 5 / 144 | 97 / 300 | 109 / 300 |
+| Worst minimum probability | -0.010604 | -0.018120 | -0.136211 | -0.190304 |
+| Any probability > 1 | No (max 0.7541) | No (max 0.6770) | Yes (1.1100) | Yes (1.0944) |
+| Negative cells | 3 (0.0042%) | 7 (0.0097%) | 4,771 (3.19%) | 4,476 (2.99%) |
+| Asset rows with a negative | 3 | 7 | 2,731 | 2,761 |
+
+  Denominators, verified rather than assumed. Each tuning origin carries 100
+  assets except the first three (2021-03-05, 2021-04-02, 2021-04-30), where OGN
+  has not yet listed (inception 2021-05-14). One candidate therefore spans
+  3 x 99 + 9 x 100 = 1,197 asset-rows = 5,985 probability cells over the 12
+  origins. So the "asset rows with a negative" row above is out of
+  12 x 1,197 = 14,364 rows for RF (0.021% and 0.049%) and
+  25 x 1,197 = 29,925 rows for LightGBM (9.13% and 9.23%), and the negative-cell
+  percentages are out of 71,820 and 149,625 cells respectively. (An earlier
+  working note quoted a denominator of 2,475 for these rows; that figure was
+  wrong and is superseded by the counts here.)
+
+What the diagnostic showed
+  - The failure is MARGINAL for Random Forest: 3 and 7 bad cells out of 71,820,
+    never above 1, and confined to 1-2 candidates.
+  - It is SUBSTANTIAL for parts of the LightGBM space: ~3% of all cells, ~9% of
+    all asset-rows, minima as low as -0.19, and maxima above 1. Several LightGBM
+    candidates were invalid at 12 of 12 origins, not one or two.
+  - Invalidity is CONCENTRATED in sharper / more confident model settings. For
+    LightGBM the affected candidates had median learning_rate 0.0998 vs 0.0303
+    for clean ones, num_leaves 384 vs 192, max_depth 12 vs 7 and
+    min_data_in_leaf 15 vs 45; feature_fraction and subsample did not separate.
+    For Random Forest the (weak, small-sample) signal was fewer trees
+    (n_estimators 50 vs 300), min_samples_split 2 vs 12 and deeper trees.
+  - The sampled invalid candidates also tended to have POOR tuning RPS: the
+    worst LightGBM offender scored 0.236 mean RPS against ~0.156 for clean
+    candidates, i.e. worse than the 0.16 naive benchmark.
+
+Decision
+  The released adjustment is PRESERVED EXACTLY. It is not clipped, renormalised,
+  calibrated or replaced. Instead, a hyperparameter candidate whose adjusted
+  forecasts are not valid probabilities at every one of the 12 tuning origins is
+  treated as INFEASIBLE:
+      - it is assigned a fixed loss of 1.0, far above any attainable mean RPS
+        (which is bounded well below 1 for five quintiles), so it can never be
+        selected;
+      - the remaining origins are skipped once the first violation is seen;
+      - the rejection, its reason and the failing origin are logged;
+      - it STILL CONSUMES one unit of the HyperOpt evaluation budget - failed
+        candidates are not replaced with extra trials;
+      - HyperOpt continues normally, and TPE naturally learns to avoid that
+        region.
+  A candidate is infeasible if any adjusted probability is < 0, > 1, non-finite,
+  or if any row fails to sum to 1 within 1e-9.
+
+  This is an implementation safeguard for obtaining valid probability forecasts,
+  NOT a new clipping or calibration procedure. The rule acts on the CANDIDATE,
+  never on the probabilities.
+
+--------------------------------------------------------------------------------
+AT. STAGE 7 - RF / LIGHTGBM IMPLEMENTATION AND PRE-M6 HYPERPARAMETER TUNING
+    (executed 2026-08-21)
+--------------------------------------------------------------------------------
+
+Scope
+  Tuning only. The 12 official M6 evaluation rounds were NOT run, the official
+  ground truth was never read, and no M6 outcome influenced any hyperparameter.
+
+Environment
+  scikit-learn 1.4.2 - the version already installed; NO upgrade was needed.
+  Step 0 of this stage tested the real finalized data (not a synthetic proxy):
+  both branches' training matrices carry genuine NaNs (no_knn 1,341 NaN cells
+  over 12,866 training rows at the first tuning origin, 567 rows affected; knn
+  813 cells over 470 rows, all from the two volume features), and
+  RandomForestClassifier both FIT and PREDICTED successfully, returning finite
+  probabilities summing to 1. Native missing-value support for trees arrived in
+  scikit-learn 1.4, so 1.4.2 suffices.
+  Newly installed for this stage: lightgbm 4.7.0, hyperopt 0.3.0.
+  Unchanged: numpy 1.26.4, pandas 2.2.2, scipy 1.15.3, Python 3.10.11.
+
+Missing-value handling
+  Native in both estimators. No imputation, filling, dropping or scaling is
+  applied anywhere in the modelling stage. The missing values produced by the
+  finalized Samartzis-style volume methodology (section AR) are intentional and
+  are passed straight through. Note the released RF wrapper calls
+  `test_df[feats].fillna(test_df[feats])`, which is a no-op; this project simply
+  passes the NaNs to the native handler.
+
+The four configurations
+  RF / no_knn, RF / knn, LGBM / no_knn, LGBM / knn - tuned independently, each
+  against its OWN branch's historical four-week quintile target. All four use
+  the same ten finalized predictors. AssetClass is deliberately NOT given to
+  LightGBM in this main experiment (the released `lgbm_model` is constructed
+  with `feats + ['AssetClass']`); no predictor is normalized or standardized.
+
+Tuning protocol (per candidate)
+  For each of the 12 pre-M6 tuning origins T (2021-03-05 .. 2022-01-07,
+  four-week Fridays):
+    1. training set = every row of that branch with
+       `eligible_for_training_from <= T`, i.e. whose four-week outcome had
+       already been realised at T. This EXPANDS with T (12,866 rows at the first
+       origin, 13,963 at the last), and the model is REFITTED at every origin.
+    2. fit on the ten features against `hist_target_quintile`;
+    3. predict that origin's cross-section (1,197 asset-rows over the 12
+       origins);
+    4. map class probabilities onto the fixed five quintile columns
+       (column j = quintile j = Rank j+1, quintile 0 = worst realised return);
+    5. apply the released cross-sectional adjustment;
+    6. reject if infeasible (section AS), else RPS against
+       `hist_target_Rank1..Rank5` using the project's own `rps_scores`,
+       imported from scripts/evaluate_m6_rps.py so tuning is scored by exactly
+       the same function that will score the M6 rounds.
+  Objective = MEAN RPS over the 12 origins; lower is better.
+
+Search spaces (reproduced from the released model registry)
+  RF   : criterion {gini, entropy, log_loss}; max_features {sqrt, log2, 0.5};
+         n_estimators 50..500 step 50; max_depth 3..20 step 1;
+         min_samples_split 2..20 step 2; min_samples_leaf 1..10 step 1.
+  LGBM : num_leaves 16..512 step 16; learning_rate loguniform 0.01..0.2;
+         min_data_in_leaf 5..55 step 5; subsample 0.5..0.9;
+         feature_fraction 0.6..0.9; max_depth 5..15 step 1.
+         Fixed: gbdt, multiclass, multi_logloss, num_class 5, linear_tree True,
+         num_boost_round 50, verbose -1, random_state 42, bagging_freq 1.
+  Budget: 20 x |space| = 120 evaluations per configuration (the released rule),
+  TPE, with the released `no_progress_loss(50)` early stop. Seed 42 everywhere
+  (models and the HyperOpt rstate).
+
+Results
+
+| Configuration | Mean pre-M6 tuning RPS | Evals used / budget | Infeasible | Best hyperparameters |
+|---|---:|---:|---:|---|
+| RF / no_knn   | 0.155614 | 119 / 120 (early stop) | 17 (14.29%) | criterion entropy, max_depth 7, max_features 0.5, min_samples_leaf 5, min_samples_split 8, n_estimators 450 |
+| RF / knn      | 0.155624 | 120 / 120 | 3 (2.50%) | criterion gini, max_depth 8, max_features 0.5, min_samples_leaf 6, min_samples_split 10, n_estimators 450 |
+| LGBM / knn    | 0.155838 | 100 / 120 (early stop) | 32 (32.00%) | num_leaves 432, learning_rate 0.032590, min_data_in_leaf 45, subsample 0.814956, feature_fraction 0.826933, max_depth 5 |
+| LGBM / no_knn | 0.155950 |  71 / 120 (early stop) | 30 (42.25%) | num_leaves 192, learning_rate 0.037855, min_data_in_leaf 50, subsample 0.716389, feature_fraction 0.610493, max_depth 5 |
+
+  Per-origin RPS ranges (best candidate): RF/no_knn 0.1499-0.1626,
+  RF/knn 0.1507-0.1633, LGBM/no_knn 0.1494-0.1632, LGBM/knn 0.1502-0.1619.
+  Total tuning time 237.5 minutes. Selected models' probabilities were valid
+  everywhere (minima 0.0104-0.0519, maxima 0.4841-0.5577, row-sum error
+  <= 1.2e-15).
+
+  These are TUNING-sample numbers on branch-specific historical labels. They are
+  NOT M6 results and are not comparable with the TSFM figures in section P; the
+  only purpose here was to select hyperparameters. Note nonetheless that all four
+  sit just below the 0.16 naive level on this pre-M6 sample, and that the four
+  configurations are separated by less than 0.0004 RPS - too close to read as a
+  ranking of the model families at this stage.
+
+  The infeasible-rejection rate tracks the diagnostic exactly: rare for RF/knn
+  (2.5%) and heavy for LightGBM (32-42%). Because rejected candidates consume
+  budget, the LightGBM searches explored fewer viable points than their nominal
+  budget suggests - LGBM/no_knn produced only 41 feasible evaluations before the
+  no-progress rule stopped it.
+
+Reproducibility
+  Fixed seed 42 for both estimators and for HyperOpt's rstate. The fitted forest
+  is fully deterministic - with a fixed random_state every tree is structurally
+  identical run to run (asserted by a test). The only residual variation is the
+  order in which per-tree probabilities are accumulated across worker threads
+  (`n_jobs=-1`), which perturbs an aggregate RPS by about 1e-16; `n_jobs=1`
+  would be bit-exact at a large cost in tuning time.
+
+Deviations from Samartzis in this stage
+  1. INFEASIBLE-CANDIDATE RULE (section AS) - new safeguard; the adjustment
+     itself is untouched.
+  2. RF SEED. The released code passes `random_state=random.seed(RANDOM_SEED)`,
+     and `random.seed()` returns None, so its forests are in fact unseeded. This
+     project passes an actual integer seed.
+  3. LGBM `bagging_freq=1` is set. The released fixed config sets
+     `subsample_freq=1`, but its SEARCH SPACE omits it and tuning replaces the
+     whole params dict, so a tuned `subsample` would silently have no effect.
+  4. AssetClass is NOT supplied to LightGBM (project decision for this main
+     experiment).
+  5. RPS is computed by this project's `rps_scores` against the branch's own
+     stored quintile memberships, rather than by the released
+     `RPS_calculation` on a price frame.
+  6. Training rows, target, features, origins and causal eligibility are this
+     project's finalized ones (sections AD-AJ), not the released indexing.
+
+Files created in this stage
+  scripts/tune_feature_baselines.py
+      RF and LightGBM implementation, the released probability post-processing,
+      the infeasible-candidate rule, and the HyperOpt/TPE tuning loop over the
+      12 pre-M6 origins. CLI: `--config model:variant`, `--max-evals N`.
+      Rerunning a configuration overwrites only that configuration's row.
+  tests/test_tune_feature_baselines.py
+      16 focused tests: the 12 tuning origins and their strict separation from
+      the M6 sample; causal, expanding, non-leaking training history in both
+      branches; the ten features with AssetClass excluded; quintile-0 = worst =
+      Rank1 ordering; the class-to-column mapping when a class is absent from
+      training; the adjustment's mean-0.20 / row-sum-1 properties; detection of
+      both bound violations, bad row sums and non-finite values; INFEASIBLE_LOSS
+      dominating any real RPS; native NaN consumption by both models; and seed
+      determinism.
+  Data/metadata/feature_baseline_tuning_results.csv
+      One row per configuration: model, variant, mean_tuning_rps,
+      best_hyperparameters, evaluations_completed / evaluation_budget /
+      early_stopped, infeasible_trials / infeasible_pct / feasible_trials, the
+      12 per-origin RPS values, training-row range, probability minima/maxima
+      and row-sum error, random_seed, the feature list, the LightGBM fixed
+      params and boost rounds, the post-processing description, package
+      versions and timings. This is the handover artifact for the M6 stage.
+
+Files modified
+  documentation_part2.txt (this section and section AS). Nothing else.
+
+Known environment note
+  LightGBM's native Dataset builder intermittently faults when invoked late in a
+  long single-process pytest session that has already exercised several other
+  numeric extension modules (an access violation inside LGBM_DatasetSetField).
+  It does not reproduce outside pytest, is unrelated to memory or thread
+  pressure (175 MB, 37 threads at the point of failure), is not affected by
+  passing numpy instead of pandas, and never occurred during tuning, which runs
+  LightGBM in a dedicated process and completed all four configurations with
+  zero errors. The corresponding test therefore performs its LightGBM call in a
+  fresh interpreter. Full suite: 81 tests pass.
+
+================================================================================
+END OF STAGE 7 (TUNING ONLY) - M6 evaluation is a separate, later stage.
+================================================================================

@@ -86,6 +86,14 @@ NO_PROGRESS_PATIENCE = 50         # source: no_progress_loss(50)
 LGBM_BOOST_ROUNDS = 50            # source: num_boost_round=50
 PROBABILITY_TOLERANCE = 1e-9
 
+# A hyperparameter candidate whose ADJUSTED forecasts are not valid probability
+# vectors at every tuning origin is INFEASIBLE. The released adjustment is kept
+# exactly as it is; only the candidate is rejected. The fixed loss is far above
+# any attainable mean RPS (which is bounded well below 1 for five quintiles), so
+# an infeasible candidate can never be selected, while still consuming one unit
+# of the HyperOpt evaluation budget.
+INFEASIBLE_LOSS = 1.0
+
 MODELS = ("rf", "lgbm")
 
 # --------------------------------------------------------------------------- #
@@ -253,23 +261,33 @@ def adjust_probabilities(proba: np.ndarray) -> np.ndarray:
     return proba + (0.2 - proba.mean(axis=0))
 
 
-def validate_probabilities(proba: np.ndarray, context: str) -> None:
-    """Every row must be a valid probability vector summing to 1."""
+def probability_report(proba: np.ndarray) -> dict[str, object]:
+    """Describe one adjusted forecast block; never raises.
+
+    A block is valid when every entry lies in [0, 1] and every row sums to 1
+    within numerical tolerance. The released adjustment forces each quintile
+    column to a cross-sectional mean of 0.20 and preserves row sums exactly, but
+    it does NOT bound individual entries, so sharp/confident cross-sections can
+    push a tail entry below 0 or above 1.
+    """
     if proba.shape[1] != N_QUINTILES:
-        raise ValidationError(f"{context}: expected {N_QUINTILES} quintile columns.")
-    if not np.isfinite(proba).all():
-        raise ValidationError(f"{context}: non-finite probability.")
-    row_error = float(np.abs(proba.sum(axis=1) - 1.0).max())
-    if row_error > PROBABILITY_TOLERANCE:
-        raise ValidationError(f"{context}: probability rows do not sum to 1 "
-                              f"(max error {row_error:.3g}).")
+        raise ValidationError(f"Expected {N_QUINTILES} quintile columns.")
+    finite = bool(np.isfinite(proba).all())
+    if not finite:
+        return {"valid": False, "reason": "non-finite probability",
+                "min": float("nan"), "max": float("nan"),
+                "row_sum_error": float("nan")}
     minimum, maximum = float(proba.min()), float(proba.max())
-    if minimum < -PROBABILITY_TOLERANCE or maximum > 1 + PROBABILITY_TOLERANCE:
-        raise ValidationError(
-            f"{context}: the released cross-sectional adjustment produced an "
-            f"invalid probability (min {minimum:.6f}, max {maximum:.6f}). "
-            "Stopping rather than inventing another correction."
-        )
+    row_error = float(np.abs(proba.sum(axis=1) - 1.0).max())
+    reasons = []
+    if minimum < -PROBABILITY_TOLERANCE:
+        reasons.append(f"probability below 0 (min {minimum:.6f})")
+    if maximum > 1 + PROBABILITY_TOLERANCE:
+        reasons.append(f"probability above 1 (max {maximum:.6f})")
+    if row_error > PROBABILITY_TOLERANCE:
+        reasons.append(f"row sum off by {row_error:.3g}")
+    return {"valid": not reasons, "reason": "; ".join(reasons),
+            "min": minimum, "max": maximum, "row_sum_error": row_error}
 
 
 # --------------------------------------------------------------------------- #
@@ -279,28 +297,41 @@ def validate_probabilities(proba: np.ndarray, context: str) -> None:
 def evaluate_candidate(model: str, params: dict, frame: pd.DataFrame,
                        origins: list[pd.Timestamp], seed: int = RANDOM_SEED,
                        ) -> dict[str, object]:
-    """Mean RPS over the 12 tuning origins, refitting at each one."""
+    """Mean RPS over the 12 tuning origins, refitting at each one.
+
+    If the adjusted forecasts at ANY origin are not valid probabilities the
+    candidate is INFEASIBLE: no mean RPS is accepted for it, the remaining
+    origins are skipped, and the caller assigns ``INFEASIBLE_LOSS``.
+    """
     per_origin, train_sizes, predict_sizes = [], [], []
-    minimum_probability, row_sum_error = 1.0, 0.0
+    minimum_probability, maximum_probability, row_sum_error = 1.0, 0.0, 0.0
     for origin in origins:
         train, predict = split_at_origin(frame, origin)
         raw = fit_predict(model, params, train, predict, seed)
         proba = adjust_probabilities(raw)
-        validate_probabilities(proba, f"{model} @ {origin.date()}")
+        report = probability_report(proba)
+        if not report["valid"]:
+            return {"feasible": False,
+                    "infeasible_origin": origin.date().isoformat(),
+                    "infeasible_reason": report["reason"],
+                    "min_probability": report["min"],
+                    "max_probability": report["max"]}
         truth = predict[TRUTH_COLUMNS].to_numpy(dtype=float)
         per_origin.append(float(rps_scores(truth, proba).mean()))
         train_sizes.append(len(train))
         predict_sizes.append(len(predict))
-        minimum_probability = min(minimum_probability, float(proba.min()))
-        row_sum_error = max(row_sum_error,
-                            float(np.abs(proba.sum(axis=1) - 1.0).max()))
+        minimum_probability = min(minimum_probability, report["min"])
+        maximum_probability = max(maximum_probability, report["max"])
+        row_sum_error = max(row_sum_error, report["row_sum_error"])
     return {
+        "feasible": True,
         "mean_rps": float(np.mean(per_origin)),
         "per_origin_rps": per_origin,
         "train_rows_min": int(min(train_sizes)),
         "train_rows_max": int(max(train_sizes)),
         "predict_rows_total": int(sum(predict_sizes)),
         "min_probability": minimum_probability,
+        "max_probability": maximum_probability,
         "max_row_sum_error": row_sum_error,
     }
 
@@ -329,7 +360,15 @@ def tune(model: str, variant: str, origins: list[pd.Timestamp],
     def objective(candidate: dict) -> dict:
         params = _jsonable(candidate)
         result = evaluate_candidate(model, params, frame, origins)
-        return {"loss": result["mean_rps"], "status": "ok",
+        if not result["feasible"]:
+            # The released adjustment is left untouched; the CANDIDATE is
+            # rejected. It still consumes one unit of the evaluation budget.
+            logger.info("%s: INFEASIBLE candidate (%s at %s) -> loss %.1f | %s",
+                        label, result["infeasible_reason"],
+                        result["infeasible_origin"], INFEASIBLE_LOSS, params)
+            return {"loss": INFEASIBLE_LOSS, "status": "ok", "feasible": False,
+                    "hyperparameters": params, "diagnostics": result}
+        return {"loss": result["mean_rps"], "status": "ok", "feasible": True,
                 "hyperparameters": params, "diagnostics": result}
 
     trials = Trials()
@@ -345,10 +384,19 @@ def tune(model: str, variant: str, origins: list[pd.Timestamp],
     # from fmin's return value, which reports hp.choice INDICES rather than the
     # chosen values (the released code sidesteps this the same way, via its log).
     results = [r for r in trials.results if r.get("status") == "ok"]
-    best = min(results, key=lambda r: r["loss"])
+    feasible = [r for r in results if r.get("feasible")]
+    if not feasible:
+        raise ValidationError(
+            f"{label}: every one of the {len(results)} evaluated candidates was "
+            "infeasible - no valid probability forecast could be produced."
+        )
+    best = min(feasible, key=lambda r: r["loss"])
     diagnostics = best["diagnostics"]
-    logger.info("%s: best mean RPS %.6f after %d evaluations (%.1f min) -> %s",
-                label, best["loss"], len(results), (time.time() - started) / 60,
+    n_infeasible = len(results) - len(feasible)
+    logger.info("%s: best mean RPS %.6f after %d evaluations "
+                "(%d infeasible, %.1f%%) in %.1f min -> %s",
+                label, best["loss"], len(results), n_infeasible,
+                100 * n_infeasible / len(results), (time.time() - started) / 60,
                 best["hyperparameters"])
     return {
         "model": model,
@@ -358,6 +406,9 @@ def tune(model: str, variant: str, origins: list[pd.Timestamp],
         "evaluations_completed": len(results),
         "evaluation_budget": budget,
         "early_stopped": len(results) < budget,
+        "infeasible_trials": n_infeasible,
+        "infeasible_pct": round(100 * n_infeasible / len(results), 2),
+        "feasible_trials": len(feasible),
         "n_tuning_origins": len(origins),
         "first_tuning_origin": origins[0].date().isoformat(),
         "last_tuning_origin": origins[-1].date().isoformat(),
@@ -367,6 +418,7 @@ def tune(model: str, variant: str, origins: list[pd.Timestamp],
         "train_rows_max": diagnostics["train_rows_max"],
         "predict_rows_total": diagnostics["predict_rows_total"],
         "min_probability": round(diagnostics["min_probability"], 8),
+        "max_probability": round(diagnostics["max_probability"], 8),
         "max_row_sum_error": diagnostics["max_row_sum_error"],
         "random_seed": RANDOM_SEED,
         "feature_columns": json.dumps(FEATURE_COLUMNS),
