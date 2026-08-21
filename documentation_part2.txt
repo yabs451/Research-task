@@ -469,3 +469,1372 @@ Also document in detail:
 ================================================================================
 END OF PART 2 — append future stages below this line's section style.
 ================================================================================
+
+--------------------------------------------------------------------------------
+Y. STAGE 6 — PREPROCESSING, TARGET CONSTRUCTION AND FEATURE ENGINEERING FOR THE
+   FEATURE-BASED RANDOM FOREST / LIGHTGBM BASELINES
+   (executed 2026-08-21)
+--------------------------------------------------------------------------------
+
+What this stage is
+  The supervised-dataset stage for the competition-grade feature-based M6
+  baselines announced in section P. It turns raw Dataset D (OHLCV) into two
+  complete, mutually independent supervised datasets ready for Random Forest and
+  LightGBM. It performs NO model fitting, NO hyperparameter tuning, NO
+  forecasting and NO evaluation; those remain for the next stage.
+
+Methodological posture (unchanged from section P, restated because it governs
+every decision below)
+  - The reference is Panagiotis Samartzis, "Predicting the Relative Performance
+    among Financial Assets: A Comparative Analysis of Different Approaches",
+    with the released implementation under `Relevant Context/`.
+  - This is an ADAPTATION, not a reproduction.
+  - The PAPER is the primary methodological guide. The released CODE is an
+    important implementation reference that was read closely and checked
+    against the paper; where the two disagree, this project follows the paper
+    and the M6 task, and records the discrepancy.
+  - `Relevant Context/` is strictly read-only reference material. Nothing in it
+    was modified, nothing was written into it, and no project module imports
+    from it. The asset-classification table described in section AH was
+    transcribed once from it into a project-native CSV; the pipeline reads only
+    the project-native file.
+  - `documentation.txt` was not touched by this stage.
+
+Inputs consumed
+  Data/raw/dataset_d_eodhd/dataset_d_ohlcv.csv   (raw, read-only)
+  Data/raw/m6_official/assets_m6.csv             (asset names/order only)
+  Data/metadata/m6_round_schedule.csv            (authoritative M6 origins)
+  Relevant Context/Universe_M6.xlsx              (read once, for asset classes)
+
+--------------------------------------------------------------------------------
+Z. DATASET D — USED EXACTLY AS ACQUIRED, INCLUDING THE KNOWN KR DEFECT
+--------------------------------------------------------------------------------
+
+Decision
+  Dataset D is used exactly as it exists on disk. It was NOT re-downloaded, NOT
+  repaired, NOT patched from another provider and NOT special-cased anywhere in
+  preprocessing. `scripts/preprocess_dataset_d.py` hashes the raw file (SHA-256)
+  before and after every run and aborts if a single byte changed; the run that
+  produced the current artifacts confirmed it unchanged.
+
+The KR limitation, accepted deliberately
+  As established in section T, EODHD's adjusted-close series for KR (Kroger)
+  contains an erroneous corporate-action adjustment on 2022-10-21: the
+  adjustment ratio steps discontinuously by ~19.4% on that date, manufacturing a
+  one-day adjusted-close move of about +23.5% where the genuine market move was
+  about +3.5%. The provider appears to have associated an unrelated $6.85
+  special dividend with KR. The identifier is correct and KR's RAW close series
+  is clean.
+
+  Because this project's return convention is adjusted close (section AC), that
+  spurious move flows into KR's daily log return on 2022-10-21
+  (log return 0.2113, i.e. +23.5%), and therefore into:
+    - KR's `feat_ret_4w_recent`, `feat_vol_3m`, `feat_max_ret_3m` and
+      `feat_abs_ret_to_volume_3m` at the origins whose trailing windows contain
+      2022-10-21 (the origins from 2022-11-11 onwards for the 20-day windows,
+      and from 2022-11-11 through 2023-01-06 for the 60-day windows);
+    - KR's daily cross-sectional quintile on 2022-10-21, hence its
+      `feat_rank5_freq_4w` at nearby origins, and marginally the daily quintile
+      boundaries of the other 99 assets on that one day;
+    - KR's Dataset-D-derived HISTORICAL four-week target for the origin
+      2022-10-14 (target window 2022-10-17 .. 2022-11-11), which coincides with
+      M6 Round 9.
+
+  It does NOT affect the official M6 evaluation in any way. The evaluation
+  ground truth is built by `scripts/evaluate_m6_rps.py` from
+  `Data/assets_m6.csv` — the official competition price file — and never from
+  Dataset D. See section AM.
+
+  Why no correction was applied. An earlier option was to replace KR with Yahoo
+  data, but mixing two providers' adjustment semantics inside one panel creates
+  more problems than it solves (different dividend-timing conventions, different
+  adjustment recomputation histories) and would have made KR the only asset in
+  the panel whose returns come from a different provider. Retaining the defect
+  and documenting it keeps the dataset internally consistent and the limitation
+  explicit. It is a documented data-provider limitation of this experiment.
+
+  Note that this is deliberately NOT treated as an "outlier" to be suppressed:
+  see section AB. A confirmed provider defect and a genuine extreme market move
+  are conceptually different things, but in this implementation neither is
+  altered.
+
+Dataset C
+  Untouched. Dataset C is the adjusted-close-only EODHD panel collected for
+  possible TSFM fine-tuning. It was neither read, regenerated, overwritten nor
+  conflated with Dataset D at any point in this stage.
+
+--------------------------------------------------------------------------------
+AA. STAGE 6A — SHARED WEEKDAY CALENDAR AND FILL POLICY
+    (scripts/preprocess_dataset_d.py)
+--------------------------------------------------------------------------------
+
+This is the COMMON preparation shared by both preprocessing variants. It
+reproduces the convention already established for Dataset A in Stage 2
+(`scripts/preprocess_dataset_a.py`) rather than inventing a new interpretation;
+only the span differs, because Dataset D needs 2009 warm-up history.
+
+Calendar
+  One shared Monday-to-Friday calendar, `pd.date_range(freq='B')`, spanning
+  2009-01-02 .. 2023-02-03 = 3,676 dates. Weekends excluded; public holidays are
+  RETAINED as calendar dates (they carry no new information but keep every asset
+  on one index). Individual exchange calendars are deliberately not used: the
+  universe mixes US and London listings, and all later work is cross-sectional.
+  Reindexing added 71 weekday dates that were absent from the raw union
+  calendar. All 13 M6 Friday anchors exist on this calendar (verified).
+
+  2009-01-02 is the first genuine observation in Dataset D (2009-01-01 was a
+  holiday), so the calendar starts there rather than at the requested 2009-01-01.
+
+Fill policy
+  Forward fill only, applied per asset per field, and only AFTER that asset's
+  first genuine observation. `pandas.ffill` never fills before the first valid
+  value, which is exactly the required rule, and this is additionally asserted
+  per asset per field in `validate_outputs`.
+    - Rationale for forward filling: it aligns assets to the common weekday
+      calendar without inventing price movement. On a date with no new
+      observation the carried-forward price implies a zero return, which is the
+      faithful representation of a position that could not change value.
+    - Rationale for prohibiting backward filling: it would manufacture price
+      history for an asset before it existed.
+    - No interpolation, no averaging, no smoothing, no cross-asset substitution.
+  Total cells forward-filled across all six fields: 77,868.
+
+Genuine later inception (27 of 100 assets)
+  Preserved as missing. The full list is in section T and in
+  `Data/metadata/dataset_d_preprocessing_summary.csv` (column
+  `leading_missing_weekdays`), ranging from DG (225 leading missing weekdays) to
+  OGN (3,225).
+
+Post-delisting (DRE)
+  DRE's final genuine observation is 2022-10-03 (Duke Realty acquisition). Its
+  final price is carried forward over the 90 subsequent weekdays through
+  2023-02-03, so every DRE log return after 2022-10-03 is exactly zero. This is
+  the treatment established in Stage 2 and is asserted explicitly. It coincides
+  with the official M6 rule that DRE's competition return is zero after
+  acquisition. NOTE: DRE's last genuine observation also carries volume 0, so
+  forward filling propagates a zero volume across those 90 weekdays; the
+  consequence for the volume features is described in section AI.
+
+Field semantics
+  All six raw fields (open, high, low, close, adjusted_close, volume) are
+  carried onto the calendar and forward-filled with the same rule. Every asset's
+  inception date is verified to be identical across the six fields. Only close,
+  adjusted_close and volume are consumed by the ten selected predictors; open,
+  high and low are materialised anyway so that the processed representation of
+  Dataset D is complete and no re-run is needed if the excluded intraday
+  features (section AH) are ever revisited.
+
+Raw data is never mutated to accomplish alignment. Stage 6A writes NEW processed
+files; the raw long-format CSV is read-only.
+
+--------------------------------------------------------------------------------
+AB. OUTLIERS — NO ECOD, NO WINSORISATION (DELIBERATE DEPARTURE)
+--------------------------------------------------------------------------------
+
+Samartzis preprocesses outliers as follows (`prepare_data` in
+Generate_forecasts.py): for every asset he fits `ECOD(contamination=0.01)` to
+that asset's return series, collects the flagged days, keeps those on which only
+ONE asset was flagged ("idiosyncratic days"), and replaces the flagged return
+with the asset's own 1st or 99th return percentile depending on sign — plus an
+unconditional rule that any |return| > 0.5 is replaced the same way.
+
+This component is NOT adopted. Nothing in this project applies ECOD,
+winsorisation, percentile clipping/capping or any generic outlier replacement.
+
+Rationale
+  Large financial returns are frequently genuine information rather than errors,
+  and this is a cross-sectional RANKING task in which the extreme movers are
+  precisely the observations that determine quintile 1 and quintile 5. Replacing
+  a real crash or repricing with a percentile would suppress the signal the task
+  is about. Concretely, in the constructed dataset the largest four-week
+  predictor values are genuine market events — CZR at -1.198 log (-70%) at the
+  2020-04-03 origin, VXX at +0.729 log (+107%) at the 2020-03-06 origin, DXC at
+  -0.541 at 2020-03-06 — all COVID-crash moves that Samartzis's |r| > 0.5 rule
+  would have flattened.
+
+  The KR provider defect is a different kind of object (a confirmed data error,
+  not a market move), but as recorded in section Z it is also left unchanged in
+  this implementation, so no observation of any kind is altered.
+
+This is a meaningful deviation from the source methodology and is listed again
+in section AP.
+
+--------------------------------------------------------------------------------
+AC. RETURN DEFINITION AND PRICE BASIS
+--------------------------------------------------------------------------------
+
+Price basis for returns: ADJUSTED CLOSE
+  Samartzis's own features use raw close (his data template has no
+  adjusted-close sheet). This project uses adjusted close, for two reasons:
+    1. Consistency. Dataset A, the Stage 2 return panel, the 12 rolling-origin
+       contexts and every TSFM result in this project are built on adjusted
+       close. A baseline built on a different price basis would not be
+       comparable.
+    2. Correctness. Inspection of the EODHD raw close series shows mechanical
+       price jumps at stock splits. Those are not investment returns; treating
+       them as returns would inject artificial extreme observations into exactly
+       the features and targets that this task ranks on.
+
+Return formula: LOG returns
+    r_t = log(P_t / P_{t-1})            P = adjusted close
+  Missing wherever either price is missing (pre-inception, and each asset's
+  first calendar row). Never replaced with zero.
+
+Cumulative multi-day returns exploit the additive identity
+    R_(a,b] = sum_{j=a+1..b} r_j = log(P_b / P_a)
+  so every four-week quantity in this stage — the recent four-week predictor,
+  the seasonality predictor and the four-week TARGET — is a simple sum of daily
+  log returns over an explicit weekday window. Samartzis uses simple returns and
+  a compounding product `(1+r).prod()-1`; the log form is the mathematically
+  equivalent adaptation for this project's convention. Because the quintile
+  target is a cross-sectional RANK, and log is strictly monotone in the simple
+  return, the log/simple choice cannot change a single target label; it changes
+  only the numerical scale of the return-valued predictors.
+
+  For interpretability the realised target is stored twice:
+  `hist_target_log_return` (the sum of daily log returns) and
+  `hist_target_simple_return = expm1(log return)`.
+
+Quantities deliberately NOT converted to returns
+  Not every OHLCV quantity was turned into a return simply because log returns
+  are used elsewhere. The dollar-volume feature (`feat_dollar_volume_2m`) keeps
+  its source construction: `log(volume * close / 1000)` with RAW close and RAW
+  volume. Raw close x raw volume is the actual currency value traded that day.
+  Substituting adjusted close there would multiply a split-adjusted price by an
+  unadjusted share count, which is economically meaningless. The absolute-return
+  numerator inside `feat_abs_ret_to_volume_3m` DOES use the adjusted-close log
+  return, because that component genuinely is a return.
+
+--------------------------------------------------------------------------------
+AD. FOUR-WEEK CLASSIFIER ORIGIN FREQUENCY AND THE ORIGIN GRID
+--------------------------------------------------------------------------------
+
+The distinction that matters
+  DAILY data are required INSIDE features (daily returns, 60-day volatility,
+  60-day maximum, daily cross-sectional ranks, rolling volume aggregates) and
+  inside the four-week target window. That is completely separate from the
+  FREQUENCY at which supervised classifier rows are emitted.
+
+  The released implementation makes this explicit: both `rforest_model.fit` and
+  `lgbm_model.fit` in all_models.py downsample their training frame to
+  approximately four-week frequency before fitting —
+      train_df[train_df['Date'].isin(pd.date_range(end=..., freq='4W-FRI', ...))]
+  with the comment "For speed we use monthly frequency (using daily frequency
+  slows things down without any increase in performance)". The paper likewise
+  defines its time index in four-week periods that it calls "monthly" for
+  convenience.
+
+  A prior experimental implementation in this project confirmed why this
+  matters: emitting a new 20-weekday target at EVERY weekday produces ~20x more
+  rows, each of whose target windows overlaps its 19 neighbours by 19/20, which
+  massively inflates effective sample size while adding almost no independent
+  information and materially changes the learning problem.
+
+Decision
+  Final supervised RF/LGBM observations are emitted ONLY on a four-week-spaced
+  grid of Friday forecast origins. Daily intermediate series are computed freely
+  inside windows.
+
+The grid
+  Anchored on this project's established M6 convention: the grid is the set of
+  dates `2022-03-04 + 28k` (k any integer) that lie on the shared weekday
+  calendar. Every such date is a Friday, and — verified numerically — every
+  consecutive pair is exactly 20 shared weekdays apart, so
+      target_end(origin_k) == origin_{k+1}
+  holds exactly. This single identity is what makes the causal KNN scheme in
+  section AK cheap (one imputation fit per grid date serves both the predictors
+  at that date and the target of the preceding origin).
+
+  Eligibility filters applied to the grid:
+    - the deepest predictor window must be defined: origin index >= 220 weekdays
+      from the start of the calendar;
+    - the complete four-week target window must exist within the data;
+    - the source methodology's model-history floor: origin >= 2010-01-01.
+  The 2010 floor binds (index 220 corresponds to 2009-11-06), so the first
+  classifier origin is 2010-01-22.
+
+  Result: 170 origins, 2010-01-22 .. 2023-01-06.
+      146 historical
+       12 tuning     (section AE below)
+       12 M6         (section AM below)
+  Stored in `Data/metadata/feature_baseline_origin_schedule.csv` with columns
+  origin_index, origin_date, target_start_date, target_end_date, m6_round,
+  origin_role, eligible_for_training_from.
+
+  2009 remains pure feature warm-up history: no classifier origin lies in 2009,
+  and 2009 observations enter only as the deep end of trailing windows.
+
+  There are no random splits anywhere. All separation is temporal.
+
+The 12 pre-M6 tuning origins — verified, not assumed
+  The paper describes tuning over roughly 7 March 2021 to 6 February 2022. The
+  released code sets `start_tuning_date = '2021-03-05'`, `end_tuning_date =
+  '2022-02-04'` and builds `dates_tuning = pd.date_range(start, end,
+  freq='4W-MON')`, then inside the tuning loop takes the FEATURE row from
+  `d - BusinessDay(1)` — the preceding Friday.
+
+  Evaluating that expression gives the 12 Mondays
+      2021-03-08, 2021-04-05, 2021-05-03, 2021-05-31, 2021-06-28, 2021-07-26,
+      2021-08-23, 2021-09-20, 2021-10-18, 2021-11-15, 2021-12-13, 2022-01-10
+  whose preceding Fridays are
+      2021-03-05, 2021-04-02, 2021-04-30, 2021-05-28, 2021-06-25, 2021-07-23,
+      2021-08-20, 2021-09-17, 2021-10-15, 2021-11-12, 2021-12-10, 2022-01-07.
+
+  The same cross-check was run for the released backtest dates
+  (`pd.date_range('2022-03-04','2023-02-03',freq='4W-MON')`), which gives the 12
+  Mondays 2022-03-07 .. 2023-01-09 whose preceding Fridays are exactly this
+  project's 12 M6 origins 2022-03-04 .. 2023-01-06. That is a complete
+  confirmation that Samartzis's Monday convention and this project's Friday
+  forecast-origin convention describe the SAME forecast points, and it validates
+  the tuning translation above.
+
+  Independently, all 12 tuning Fridays sit on this project's own backward grid:
+  2022-03-04 - 28k for k = 2..13. Note k = 1 (2022-02-04) is deliberately NOT a
+  tuning origin — Samartzis's date_range stops before it — so there is exactly a
+  one-period gap between the tuning sample and the M6 sample. That gap is
+  preserved.
+
+  The implementation therefore selects the tuning origins as "the last 12 grid
+  origins strictly before the first M6 origin, excluding the single grid origin
+  immediately preceding it", and asserts that the result begins 2021-03-05 and
+  ends 2022-01-07.
+
+  No hyperparameter tuning was performed in this stage. The origins are prepared
+  and labelled for the next one.
+
+Training eligibility
+  [SUPERSEDED by section AR - the zero-volume rule was later replaced by the
+   released Samartzis behaviour; the counts below are pre-correction.]
+  Every row carries `eligible_for_training_from = target_end_date`. At any later
+  model cutoff T, a historical row t may enter training only if
+  `target_end(t) <= T`, so a model never learns from a four-week outcome that
+  had not yet occurred. Concretely, using rows with complete features and an
+  available target:
+      at the first tuning origin (2021-03-05): 12,523 rows over 145 origins
+        (no_knn) / 12,714 rows over 145 origins (knn)
+      at the first M6 origin (2022-03-04):     13,810 rows over 158 origins
+        (no_knn) / 14,008 rows over 158 origins (knn)
+
+--------------------------------------------------------------------------------
+AE. THE CLASSIFICATION TARGET — AND THE PAPER/CODE DISCREPANCY
+--------------------------------------------------------------------------------
+
+The discrepancy
+  The paper describes the feature-based classifiers as using information through
+  time t to predict which quintile the asset's return over the NEXT period
+  belongs to, and the M6 period is four weeks.
+
+  The released code does something different. In `prepare_data` it computes
+  `monthly_returns` (a four-week return) and stores it as
+  `train_df['target_return']` — but the label the models actually fit is
+      roll_ranks = scores_to_quintiles(returns_df.fillna(0))
+      train_df['target'] = roll_ranks
+  i.e. the cross-sectional quintile of a SINGLE DAY'S return, and both
+  `rforest_model` and `lgbm_model` fit against `train_df['target']`. The stored
+  four-week return is never used as the fitted label.
+
+  This project does NOT reproduce that. It implements the target the paper
+  describes and the M6 competition requires.
+
+The target implemented
+  For each forecast origin t and asset a:
+    1. predictors use information available on or before t (section AF);
+    2. the realised cumulative return over the NEXT 20 shared weekdays is
+           hist_target_log_return(a, t) = sum of r_a,j for j in (t, t+20]
+                                        = log(P_a,t+20 / P_a,t)
+       with target_start = t+1 weekday and target_end = t+20 weekdays
+       (= t + 28 calendar days = the next grid origin);
+    3. the cross-section of those realised four-week returns is ranked;
+    4. ranks are mapped to the five M6 quintiles with the project's existing
+       tie-aware quintile function `rank_to_quintiles`, IMPORTED DIRECTLY from
+       `scripts/evaluate_m6_rps.py` so the historical labels use bit-identical
+       logic to the official evaluator (rank ascending, quintile index 0 =
+       lowest return = Rank1, quintile index 4 = highest = Rank5; a tied block
+       receives the average membership of the rank slots it occupies);
+    5. `hist_target_quintile` is the argmax of that membership vector, which is
+       the ordinary quintile index for any untied asset. The full fractional
+       membership is stored alongside it as `hist_target_Rank1..Rank5` so the
+       model stage can use either.
+
+  Explicitly: this is a 20-day CUMULATIVE return, not a one-day return shifted
+  by 20 days. A unit test asserts that the produced label differs from
+  `returns.iloc[t+20]`.
+
+Cross-section membership for the target
+  The ranking at origin t covers every asset for which a cumulative four-week
+  return can be formed with that branch's data. Cross-section sizes range from
+  77 assets (2010-01-22) to 100 (from mid-2021 onwards); the median origin has
+  91 rows. Boundaries are computed from the number of assets actually ranked,
+  which is how `rank_to_quintiles` already behaves.
+
+  In the KNN branch this cross-section can be 1-2 assets larger than in the
+  no-KNN branch, because an asset that listed strictly inside the target window
+  has an imputable (hence rankable) four-week return there. This is legitimate
+  under the target's information cutoff (section AK) and is one of the two
+  mechanisms by which the branches' historical labels differ. It affects 20 of
+  170 origins. An alternative convention — restricting the target cross-section
+  to assets that already existed at the origin — would make the two branches'
+  labels identical; it was NOT adopted because the released implementation ranks
+  the full imputed matrix, and because the whole point of the two-pipeline design
+  is to let KNN reach the labels wherever it legitimately can. This is flagged
+  as a reversible convention in section AP.
+
+Target metadata stored per row
+  origin_date, target_start_date, target_end_date, eligible_for_training_from,
+  hist_target_log_return, hist_target_simple_return, hist_target_quintile,
+  hist_target_Rank1..Rank5, hist_target_cross_section_size,
+  hist_target_available.
+
+Observed label distribution (no_knn, all 15,363 rows):
+  quintile 0: 3,003   1: 3,081   2: 3,069   3: 3,081   4: 3,129
+which is the expected near-uniform result of a per-origin cross-sectional
+quintile split with varying cross-section sizes.
+
+--------------------------------------------------------------------------------
+AF. FEATURE ALIGNMENT — TRANSLATING THE RELEASED shift(20) INDEXING
+--------------------------------------------------------------------------------
+
+Why the released `.shift(20)` calls must NOT be copied
+  The released implementation indexes rows by the END of the target period, not
+  by the forecast origin. Reading `prepare_data` closely:
+
+    monthly_returns[m] = (1 + returns).prod over rows [m-20, m-1] - 1
+                       = P_{m-1} / P_{m-21} - 1
+    target             = monthly_returns                    (row m)
+    feat_0             = monthly_returns.shift(20)          (row m-20)
+
+  Setting the released row index to `m = t + 21` where t is OUR forecast origin
+  makes everything line up:
+    target at row m       -> P_{t+20} / P_t - 1   = exactly our four-week target
+    feat_0 at row m       -> P_t / P_{t-20} - 1   = the four weeks ending at t
+  So the released `.shift(20)` exists purely to convert a target-aligned index
+  into origin-aligned information. Copying it into our already origin-aligned
+  formulation would apply the lag a SECOND time and push every predictor a month
+  further into the past.
+
+  The same translation exposes a one-day inconsistency in the released code. For
+  the rolling predictors, `X.rolling(w).agg().shift(20)` evaluated at row
+  m = t+21 covers rows [t-w+2, t+1] — one day PAST the forecast origin. feat_0
+  and the target are exactly aligned; the rolling features are not. Our
+  implementation resolves this in favour of causality: every rolling window ends
+  at t inclusive, i.e. [t-w+1, t].
+
+Procedure applied to every feature
+  For each of the ten predictors: (1) read the paper's economic/time-window
+  description; (2) read the released formula; (3) work out which historical dates
+  that formula actually references once the target-aligned index is unwound;
+  (4) restate the window explicitly relative to origin t; (5) implement the
+  explicit form directly (no `.shift` anywhere in this project's feature code);
+  (6) verify numerically.
+
+  Implementation consequence: `features_at_origin()` receives the return matrix
+  and an integer origin position and slices closed-form windows such as
+  `returns.iloc[i-19 : i+1]`. It cannot in principle reach past the origin. The
+  caller additionally passes a return matrix already truncated at the origin, so
+  the guarantee is enforced twice.
+
+Numerical verification performed
+  - Unit tests recompute the recent four-week return and the seasonality feature
+    from synthetic data and compare against explicitly written windows.
+  - A "poisoning" unit test overwrites every observation after the origin with a
+    large constant and asserts the entire feature block is unchanged.
+  - `spot_check_feature_windows()` (run as part of the build) samples 60 random
+    complete rows from the real no-KNN dataset and recomputes ALL TEN features
+    from first principles in explicit origin coordinates, requiring agreement to
+    rtol 1e-9. 600 independent recomputations passed.
+
+--------------------------------------------------------------------------------
+AG. THE TEN PAPER-SELECTED PREDICTORS
+--------------------------------------------------------------------------------
+
+All windows below are in shared weekdays and are stated relative to forecast
+origin t, with t itself INCLUDED (information available at t). r_j denotes the
+adjusted-close daily log return on weekday j; P denotes adjusted close; C
+denotes RAW close; V denotes raw volume.
+
+Shared intermediate quantity used by features 5 and 6:
+    LDV_j   = log(V_j * C_j / 1000)          (undefined, i.e. missing, when
+                                              V_j * C_j <= 0)
+    D40_j   = 40 * mean(LDV over the available days in [j-39, j])
+              defined only once 40 weekdays have elapsed since the asset's
+              inception and at least 20 of the 40 days are available.
+    When nothing is missing D40 is identical to the released
+    `LDV.rolling(40).sum()`; see section AI for the rule and its scope.
+
+1. feat_ret_4w_recent            (released `feat_0`)
+   Inputs   adjusted close.
+   Formula  sum of r_j for j in [t-19, t]  ==  log(P_t / P_{t-20}).
+   Window   the 20 weekdays ending at and including the origin.
+   Meaning  the asset's most recent four-week price momentum — the four-week
+            period immediately preceding the one being forecast.
+   Why it might inform ranking  short-horizon cross-sectional momentum /
+            reversal is one of the most studied return predictors.
+   Source mapping  `monthly_returns.shift(20)`; translates exactly to [t-19, t]
+            with no residual lag.
+   Log adaptation  sum of log returns instead of `(1+r).prod()-1`.
+   Missing behaviour  requires all 20 daily returns; otherwise missing.
+                      Missing in 24 of 15,363 no-KNN rows; 0 in the KNN branch.
+
+2. feat_ret_4w_seasonal_11m      (released `feat_6`)
+   Inputs   adjusted close.
+   Formula  sum of r_j for j in [t-219, t-200]  ==  log(P_{t-200} / P_{t-220}).
+   Window   the ELEVENTH four-week block preceding the origin.
+   Derivation  the released `monthly_returns.shift(20*11)` is `feat_0` lagged by
+            a further 200 weekdays. Unwinding the target-aligned index
+            (m = t+21) puts its price window at P_{t-220} -> P_{t-200}. In the
+            paper's units of four-week "months" that is the month-11 block,
+            hence "the four-week return approximately 11 months prior". In
+            calendar terms the window sits about 9.5-10.5 months before the
+            origin, and about 10.6-11.6 months before the target period — the
+            comparable point roughly one year earlier.
+   Meaning  return seasonality / annual-cycle effects.
+   Missing behaviour  requires all 20 daily returns of that block, hence about
+            11 months of history. Missing in 284 of 15,363 no-KNN rows (the
+            binding constraint for recently listed assets); 0 in the KNN branch.
+   This is also the feature that dictates the 2009 warm-up window (section R):
+   220 weekdays of history before the earliest 2010 origin.
+
+3. feat_vol_3m                   (released `feat_1`)
+   Inputs   adjusted close.
+   Formula  sample standard deviation (ddof = 1) of r_j over [t-59, t].
+   Window   60 weekdays ending at the origin (~3 months).
+   Meaning  recent total return volatility.
+   Source mapping  `returns.rolling(60).std().shift(20)`, whose window is
+            [t-58, t+1]; shifted back one day here so nothing after t is used.
+   Missing behaviour  requires all 60 daily returns. Missing in 73 no-KNN rows.
+   Note   DRE's post-acquisition zero-return stretch legitimately produces
+          feat_vol_3m = 0 at the last origins.
+
+4. feat_max_ret_3m               (released `feat_2`)
+   Inputs   adjusted close.
+   Formula  max of r_j over [t-59, t].
+   Window   60 weekdays ending at the origin.
+   Meaning  the "MAX effect" — the largest single-day gain in the recent past,
+            a well-documented lottery-demand proxy that predicts LOW subsequent
+            returns.
+   Source mapping / missing behaviour  as feature 3 (73 missing, no-KNN).
+
+5. feat_dollar_volume_2m         (released `feat_3`)
+   Inputs   RAW close, raw volume. NOT a return.
+   Formula  D40_t, i.e. the 40-day aggregate of log(V * C / 1000).
+   Window   40 weekdays ending at the origin (~2 months).
+   Meaning  a liquidity / size / trading-activity proxy. The paper describes the
+            natural log of trading volume x price per share; the released code
+            computes that log quantity and then aggregates it over ~40 business
+            days, so the feature is 40 x the average log dollar volume (in
+            thousands of currency units), not the log of the summed dollar
+            volume. That construction is preserved.
+   Source mapping  `np.log(volume*close/1000).rolling(40).sum().shift(20)`,
+            window [t-38, t+1]; shifted back one day here.
+   Price basis  RAW close deliberately — see section AC.
+   Missing behaviour  see section AI. Missing in 113 rows in BOTH branches (KNN
+            does not touch volume).
+
+6. feat_abs_ret_to_volume_3m     (released `feat_4`)
+   Inputs   adjusted close (numerator), RAW close and raw volume (denominator).
+   Formula  60 * mean over j in [t-59, t] of ( |r_j| / D40_j ),
+            requiring at least 30 available terms.
+   Window   60 weekdays ending at the origin, with each term's denominator being
+            the 40-day dollar-volume aggregate ending at that SAME day j.
+   Source mapping  `(returns.abs() / feat_3).rolling(60).sum().shift(20)` where
+            `feat_3` at that point in the released script is the rolling-40 sum
+            BEFORE its own `.shift(20)`. That ordering is deliberate in the
+            source and is preserved: numerator and denominator are
+            contemporaneous. The outer 60-day window is shifted back one day
+            here, as for features 3-5.
+   Meaning  an Amihud-style illiquidity ratio: how much absolute price movement
+            each unit of trading activity is associated with.
+   Log adaptation  |r| uses the adjusted-close LOG return.
+   Caveat   the denominator is a log-scale aggregate and can approach or cross
+            zero for extremely thinly traded assets, which makes the ratio
+            unstable there. Measured on the real data: 11 of 15,363 rows have
+            D40_t < 40 (an average log dollar volume below 1) and exactly 1 row
+            has D40_t <= 0 (VXX at the 2018-06-01 origin). These are the
+            provider's genuinely tiny reported share counts for VXX in 2018 and
+            SEGA.L in 2011-2012, not a computation error. This is a property of
+            the source formula, not something this stage invented, and it was
+            not "fixed"; it is recorded here and in section AP.
+   Missing behaviour  147 missing rows in both branches.
+
+7-10. feat_rank1_freq_4w, feat_rank2_freq_4w, feat_rank4_freq_4w,
+      feat_rank5_freq_4w             (released `feat_Rank1/2/4/5`)
+   Inputs   adjusted close (daily returns), all assets.
+   Construction
+     For each weekday j in [t-19, t]:
+       take the cross-section of that day's daily log returns across all assets
+       that have a return on day j in this branch's return matrix, and compute
+       each asset's tie-aware M6 quintile membership with the SAME
+       `rank_to_quintiles` used for the target and for the official evaluator.
+     Average those membership vectors over the 20 days.
+     Report components 1, 2, 4 and 5.
+   Window   the 20 weekdays ending at the origin.
+   Why rank 3 is omitted  the five frequencies sum to 1, so the middle
+            component is redundant; this follows the source.
+   Meaning  how persistently the asset has occupied the extremes of the daily
+            cross-sectional return distribution over the past four weeks — a
+            direct, model-free description of recent relative behaviour.
+   Source mapping  `scores_to_quintiles(returns_df.shift(20))` then
+            `.rolling(20).agg(count == q)/20`, whose effective daily-return
+            window is [t-18, t+1]; shifted back one day here to [t-19, t].
+            The released code uses `pd.qcut(..., labels=False)` per day; this
+            project uses its own tie-aware quintile function instead, so that
+            one single quintile implementation is used everywhere in the
+            project. The two agree whenever there are no ties, and the tie-aware
+            version additionally handles a cross-section of fewer than 100
+            assets correctly, which matters for early origins.
+   CRITICAL distinction  these are DAILY-rank PREDICTORS. They are not the
+            target. The target remains the quintile of the FUTURE cumulative
+            four-week return (section AE). The released code's conflation of a
+            daily-rank quantity with the fitted label is exactly the defect this
+            project does not reproduce.
+   Missing behaviour  requires the asset to have a return on all 20 days.
+            Missing in 24 no-KNN rows; 0 in the KNN branch.
+
+Naming
+  Project-native names are used throughout. The mapping to the released
+  `feat_*` names is given above and is also embedded in the source code as the
+  `FEATURE_NOTES` dictionary in `scripts/build_feature_baseline_dataset.py`.
+
+--------------------------------------------------------------------------------
+AH. FEATURES DELIBERATELY EXCLUDED, AND ASSET METADATA
+--------------------------------------------------------------------------------
+
+Excluded because they are not in the paper's reported final selected set
+  feat_5   the lagged QUARTERLY return (`quarterly_returns.shift(20)`). It is
+           constructed in the released repository and is used by its models,
+           but it is not in the paper's reported final feature list. Since the
+           paper is this project's primary guide, it is excluded.
+  high_low         (high - low) / close
+  open_close       (close - open) / open
+  open_close_gap   (open - close[t-1]) / close[t-1]
+  vol_change       volume.pct_change(1)
+           all four are intermediate/candidate variables in the released
+           repository that do not appear in the paper's final set.
+  The underlying open/high/low panels ARE materialised by Stage 6A, so
+  revisiting any of these later needs no re-download and no re-run of
+  acquisition.
+
+Asset metadata retained (NOT counted among the ten numerical predictors)
+  `Data/metadata/m6_asset_metadata.csv`, one row per asset in the project's
+  official order:
+      official_order, symbol, name, asset_type, sector_or_etf_type, asset_class
+  Provenance: transcribed ONCE from the official M6 universe classification as
+  held in the read-only reference copy `Relevant Context/Universe_M6.xlsx`,
+  with the single naming fix already validated in Stage 1B (the reference lists
+  EG where this project uses the canonical M6 ticker RE). The reference file was
+  not modified and is not read by any pipeline module; only this project-native
+  CSV is. Verified: exactly 100 rows matching the official symbol set.
+  `asset_class` reproduces the released code's `AssetClass` derivation —
+  the sector/ETF-type field, with all 50 single stocks collapsed into one
+  "Stocks" class — giving Stocks 50, Equities 37, Fixed Income 9, Commodities 3,
+  Volatility 1.
+
+  These columns are carried on every supervised row. They are NOT part of the
+  ten paper-selected numerical predictors and were not treated as such. Whether
+  the models consume `asset_class` is a MODEL-STAGE question and is left open on
+  purpose: in the released code `lgbm_model` is constructed with
+  `feats=feats_to_use+['AssetClass']` and declares it a LightGBM categorical
+  feature, whereas `rforest_model` receives `feats=feats_to_use` only. That
+  asymmetry must be inspected and decided explicitly in the next stage.
+
+--------------------------------------------------------------------------------
+AI. ZERO / MISSING / NONPOSITIVE VOLUME IN THE VOLUME FEATURES
+--------------------------------------------------------------------------------
+[SUPERSEDED IN PART by section AR. The FINDINGS below still stand; the "local
+rule adopted" and its scope figures were replaced on 2026-08-21 by the released
+Samartzis behaviour. Read section AR for the rule now in force.]
+
+
+What was found
+  - Raw Dataset D contains 1,946 asset-days with volume exactly 0 (0.62% of
+    315,042 rows). No negative and no missing volumes.
+  - After calendar alignment and forward filling, zero-volume asset-days rise to
+    2,122 out of 328,020 post-inception asset-days (0.647%), affecting 13
+    assets.
+  - The distribution is overwhelmingly the thinly traded London-listed ETFs:
+        SEGA.L 814, IEFM.L 566, IEVL.L 280, HIGH.L 113, DRE 90, SPMV.L 84,
+        IEAA.L 70, JPEA.L 53, IUVL.L 28, CHTR 18, VXX 3, MCHI 2, CNC 1
+        (post-fill counts; raw counts are alongside them in
+        `Data/metadata/dataset_d_preprocessing_summary.csv`).
+  - DRE's rise from 1 raw zero-volume day to 90 is entirely mechanical: its
+    final genuine observation (2022-10-03) itself reported volume 0, and the
+    established forward-fill policy carries that value across the remaining 90
+    weekdays.
+  - Most of these are not calendar-alignment artefacts but genuine
+    non-trading/zero-reported-volume days for illiquid instruments.
+  - Separately, eight assets have a MEDIAN reported daily dollar volume below
+    $1M, led by SEGA.L at about $5,900. Sampling the raw rows confirms the
+    provider genuinely reports single- and double-digit share counts for
+    SEGA.LSE and, in 2018, for VXX.US. Those values are preserved.
+
+Why it needs handling at all
+  `log(V * C / 1000)` is undefined for nonpositive dollar volume. The released
+  code handles this by letting the value become -inf inside a rolling SUM and
+  then calling `.replace([inf, -inf], nan)` afterwards, which means a single
+  zero-volume day destroys the entire 40-day aggregate. On this dataset that
+  rule would have wiped out most of SEGA.L's and IEFM.L's volume features and
+  cascaded into `feat_abs_ret_to_volume_3m`.
+
+The local rule adopted (feature construction only)
+  1. An asset-day with V * C <= 0 is treated as MISSING in the daily
+     log-dollar-volume series. It is not floored, clipped, zero-substituted or
+     imputed.
+  2. The 40-day aggregate is the MEAN of the available days in the window
+     rescaled by 40. When no day is missing this is arithmetically identical to
+     the released rolling sum (asserted by a unit test). At least 20 of the 40
+     days must be available.
+  3. The aggregate additionally stays undefined until a full 40-weekday window
+     has elapsed since the asset's inception, so rule 2 relaxes the requirement
+     ONLY for genuine zero-volume days and never for a short trading history.
+  4. `feat_abs_ret_to_volume_3m` requires at least 30 of its 60 daily terms.
+
+Scope of the effect
+  With this rule, `feat_dollar_volume_2m` is missing in 113 of 15,363 rows
+  (0.74%) and `feat_abs_ret_to_volume_3m` in 147 (0.96%), identically in both
+  branches (the KNN imputation touches only the return matrix, never volume).
+  The rule is the sole reason that these two features remain missing in the KNN
+  branch, which is why that branch's completeness ceiling is 15,205 rather than
+  15,363 rows.
+
+  RAW DATASET D WAS NOT MODIFIED. This is entirely a processed-feature rule.
+
+--------------------------------------------------------------------------------
+AJ. TWO COMPLETE PREPROCESSING PIPELINES
+--------------------------------------------------------------------------------
+
+Design
+  The two variants are NOT "one target dataset with two versions of the
+  predictors". Each is a complete pipeline:
+
+    common raw + calendar preparation (Stage 6A)
+        |
+        +-- variant "knn"     : KNN-process the daily log-return matrix
+        |                       -> KNN-branch features
+        |                       -> KNN-branch four-week realised returns
+        |                       -> KNN-branch historical quintile labels
+        |
+        +-- variant "no_knn"  : retain genuine missing returns
+                                -> no-KNN features
+                                -> no-KNN four-week realised returns
+                                -> no-KNN historical quintile labels
+
+  One implementation with a `variant` switch — `build_variant(variant, ...)` in
+  `scripts/build_feature_baseline_dataset.py`, exposed as
+  `--variant {no_knn,knn}` on the CLI. The feature and target mathematics is a
+  single shared code path (`features_at_origin`, `target_at_origin`); the only
+  thing that differs is which return matrix is handed to it. The pipeline is not
+  duplicated.
+
+KNN configuration (variant "knn")
+  `sklearn.impute.KNNImputer(n_neighbors=10, weights="distance")`, the released
+  configuration, applied to the daily LOG-return matrix (dates x assets, so the
+  imputer's "samples" are dates and its "features" are assets, exactly as in the
+  released code). The source presents this generically as missing-value
+  imputation and gives no further motivation; no additional motivation is
+  invented here.
+
+  Two necessary local rules:
+    - an asset with NO observation at all by the imputation cutoff has an
+      entirely empty column and cannot be imputed; it is left missing. This has
+      the useful consequence that the causal scheme never fabricates an asset's
+      existence at its own forecast origin;
+    - calendar rows that are entirely missing contribute nothing to the fit and
+      are excluded from it, then restored as missing.
+
+  What KNN actually reaches on this data: after forward filling, a return is
+  missing only in an asset's PRE-INCEPTION period (plus the first calendar row).
+  So KNN's practical effect is to give recently listed assets a synthetic
+  pre-inception return history, which lets their trailing feature windows fill.
+
+Variant "no_knn"
+  No imputation of any kind. Genuine missing returns are preserved. Where a
+  feature or a target cannot be formed from available observations, it is left
+  unavailable rather than manufactured. No substitute imputation method was
+  introduced to remove NaNs.
+
+Row-existence rule (identical in both branches)
+  A supervised row (t, a) exists only if asset a has a genuine adjusted-close
+  observation on or before t. Both branches therefore emit 15,363 rows over 170
+  origins (77 to 100 assets per origin). The branches differ in the CONTENT of
+  those rows, not in which (origin, asset) pairs are attempted.
+
+Observed differences between the branches
+  [SUPERSEDED by section AR - the zero-volume rule was later replaced by the
+   released Samartzis behaviour; the counts below are pre-correction.]
+  1. Feature completeness
+       rows with all ten features present:  no_knn 15,006   knn 15,205
+     The KNN branch supplies 199 additional fully usable rows. Per-feature
+     missing counts:
+       feature                        no_knn   knn
+       feat_ret_4w_recent                 24     0
+       feat_ret_4w_seasonal_11m          284     0
+       feat_vol_3m                        73     0
+       feat_max_ret_3m                    73     0
+       feat_dollar_volume_2m             113   113
+       feat_abs_ret_to_volume_3m         147   147
+       feat_rank1/2/4/5_freq_4w           24     0  (each)
+     The two volume features are identical because KNN never touches volume.
+     The rows the no-KNN branch cannot complete are concentrated in SEGA.L (42),
+     IEFM.L (29), IEVL.L (24) and then 11 rows each for the 20 late-listing
+     assets (their first ~11 months of origins, where the seasonality feature is
+     undefined).
+  2. Feature VALUES
+     The five continuous return/volume features are numerically IDENTICAL
+     wherever both branches define them (max absolute difference 0.0). That is
+     expected: those windows require complete data, so if the no-KNN branch can
+     form them at all, no imputed value entered them.
+     The four rank-frequency features DO differ, because the daily
+     cross-sectional quintile boundaries shift when imputed assets join the
+     cross-section: 214 / 316 / 316 / 387 rows differ for ranks 1 / 2 / 4 / 5,
+     with a maximum absolute difference of 0.10 (i.e. two days out of twenty).
+  3. Historical LABELS
+     The realised four-week target RETURN is identical wherever both branches
+     define it (max absolute difference 1.1e-16, pure floating-point noise) —
+     because after inception all returns are genuine, so there is nothing inside
+     a target window for KNN to impute. The QUINTILE labels nevertheless differ
+     in 40 of 15,363 rows across 17 origins (max shift: one quintile), caused
+     entirely by the cross-section-membership mechanism described in section AE:
+     20 origins have a target cross-section 1-2 assets larger in the KNN branch,
+     which moves the quintile boundaries.
+     Overall historical label agreement: 0.9974.
+  4. Training-set size at a given cutoff
+     see section AD.
+
+  The branches were NOT forced to agree on anything, and no reconciliation step
+  exists. The difference is the object of study.
+
+--------------------------------------------------------------------------------
+AK. KNN CAUSALITY
+--------------------------------------------------------------------------------
+
+The problem
+  Fitting one KNN imputer to the whole 2009-2023 matrix — as the released code
+  does, before any backtest date exists — lets 2023 observations influence how a
+  2011 return is imputed, and therefore contaminates every historical forecast
+  the backtest recreates. That is unacceptable in a rolling-origin backtest.
+
+Two different, deliberately different, information cutoffs
+  PREDICTORS at forecast origin t
+      may use information dated <= t only. Any KNN-imputed return that enters a
+      predictor at t must come from a fit containing no observation later than
+      t. Nothing after t may influence predictors at t.
+
+  HISTORICAL TARGET for origin t
+      deliberately describes what happened AFTER t. Its four-week window ends at
+      target_end(t). If missing returns inside that window need KNN processing,
+      that processing may use information through target_end(t) — by the time
+      the label is knowable, those observations have occurred. It must not use
+      anything later than target_end(t).
+
+  Formally:
+      predictor construction for t        : information <= t
+      KNN target construction for t       : information <= target_end(t)
+
+Training eligibility
+  At a later model cutoff T, historical row t may enter training only if
+  target_end(t) <= T. Stored on every row as `eligible_for_training_from`.
+  A model therefore never learns from a four-week outcome that had not yet
+  happened at that point in history.
+
+Implementation, and why it is cheap
+  Because consecutive grid origins are exactly HORIZON = 20 shared weekdays
+  apart, target_end(origin_k) == origin_{k+1} exactly. So ONE causal KNN fit per
+  grid date serves two purposes at once:
+      the fit at cutoff g -> predictors at origin g
+                          -> historical target of origin g - 20 weekdays
+  The build therefore performs 171 KNN fits (170 origins + one final fit at the
+  last target_end, 2023-02-03), not one per weekday, and never holds more than
+  one imputed matrix in memory. Wall time for the KNN branch: about 6 minutes.
+  A daily-frequency causal KNN backtest framework was explicitly not built,
+  because the classifier origins are four-week spaced and would not use it.
+
+  Note that the no-KNN branch needs no cutoff logic at all: its features are
+  causal by construction, so it is computed directly from the single processed
+  return panel.
+
+How leakage was tested (positive and negative controls)
+  In `verify_knn_causality()`, run as part of every full build, at the first
+  tuning origin (2021-03-05):
+    - PREDICTORS: every return after the origin is overwritten with a large
+      constant (9.0), the causal imputation and feature block are rebuilt, and
+      the result is required to be exactly equal to the uncorrupted block.
+      PASSED.
+    - Negative control: corrupting returns INSIDE the predictor windows must
+      change the features, otherwise the test above would be vacuous. PASSED
+      (the features do change).
+    - TARGET: corrupting every return after target_end must leave the historical
+      label unchanged. PASSED.
+    - Negative control: corrupting returns INSIDE the target window must change
+      the label. PASSED.
+  Unit tests add: KNN imputation is unchanged by post-cutoff corruption; the
+  imputed frame has exactly cutoff+1 rows; an asset with no history at the
+  cutoff stays entirely missing (it cannot be fabricated before it exists).
+  A further unit test poisons all post-origin data and asserts the whole
+  feature block is unchanged, which covers the no-KNN branch as well.
+
+--------------------------------------------------------------------------------
+AL. NO FEATURE NORMALIZATION AT THIS STAGE
+--------------------------------------------------------------------------------
+
+The paper contains a general statement that scale-sensitive models are
+normalized. Inspection of the released implementations shows this is NOT applied
+uniformly: `rforest_model` and `lgbm_model` consume their feature inputs
+directly with no StandardScaler-style step, while models that actually need it
+(e.g. `mlp_model`) do their own scaling internally.
+
+RF and LightGBM are tree ensembles and are invariant to monotone rescaling of
+individual features, so a global standardisation would add nothing but would
+make the stored features less interpretable and would introduce a fitted
+statistic that itself needs a causal cutoff.
+
+Decision: the ten predictors are stored exactly as engineered. No
+standardisation, normalisation, scaling or centring is applied in this stage.
+If any later model requires scaling, that becomes an explicit, documented
+model-stage decision with its own causality treatment.
+
+--------------------------------------------------------------------------------
+AM. M6 ORIGINS AND THE SEPARATION OF EVALUATION GROUND TRUTH
+--------------------------------------------------------------------------------
+
+M6 origins
+  The project's existing round schedule, `Data/metadata/m6_round_schedule.csv`,
+  is the authority and was reused, not reinterpreted. The forward extension of
+  the four-week Friday grid reproduces it exactly, which is asserted in the code
+  and in the tests:
+      origins        2022-03-04, 2022-04-01, 2022-04-29, 2022-05-27, 2022-06-24,
+                     2022-07-22, 2022-08-19, 2022-09-16, 2022-10-14, 2022-11-11,
+                     2022-12-09, 2023-01-06
+      target_start   equals the schedule's forecast_start_date for all 12
+      target_end     equals the schedule's forecast_end_date for all 12
+  These are the same 12 evaluation periods used by the TSFM experiments and the
+  naive benchmark, which is what keeps the eventual RF/LGBM comparison
+  like-for-like.
+
+The separation that must not be blurred
+  BRANCH-SPECIFIC historical supervised labels
+      Every target column in the supervised files is prefixed `hist_target_`.
+      These are built from Dataset D by that branch's own pipeline. They are
+      allowed to differ between the KNN and no-KNN branches, and they do
+      (section AJ). They exist to TRAIN models.
+
+  FIXED official M6 evaluation ground truth
+      There is exactly one realised outcome per asset per round. It is built by
+      `scripts/evaluate_m6_rps.py` from the official competition price file
+      `Data/assets_m6.csv`, using `build_ground_truth` and `rank_to_quintiles`.
+      It exists to SCORE models.
+
+  This stage does not define, alter, shadow or duplicate the evaluation truth.
+  `scripts/evaluate_m6_rps.py` was not modified (verified: git reports it
+  unchanged). The RPS scorer, the official-tie cross-check
+  (`official_reference_quintiles`), the DRE competition treatment and the
+  ground-truth construction are all untouched. The only interaction is in the
+  other direction: this stage IMPORTS `rank_to_quintiles` from the evaluator so
+  that historical labels use identical quintile logic. Nothing is written back.
+
+  Rows at the 12 M6 origins DO carry Dataset-D-derived `hist_target_*` columns,
+  because the data to compute them exists. Those columns are NOT the evaluation
+  truth and must never be used as such. They are useful for diagnostics (e.g.
+  comparing Dataset D's realised returns against the official file). The next
+  stage must score forecasts through `scripts/evaluate_m6_rps.py` only.
+
+--------------------------------------------------------------------------------
+AN. OUTPUT ARCHITECTURE — WHAT IS MATERIALISED AND HOW TO CONSUME IT
+--------------------------------------------------------------------------------
+
+Design choice
+  Everything is materialised; nothing is generated on demand. The concern that
+  motivated a dynamic design — that causal KNN is cutoff-specific and would
+  require dozens of near-duplicate large files — dissolves once the grid
+  identity target_end(origin_k) == origin_{k+1} is exploited (section AK): one
+  KNN fit per grid date is enough, each row's features and label are built at
+  their own correct cutoffs, and the results are simply accumulated into ONE
+  flat table per variant. A later training set at cutoff T is then a row filter,
+  `eligible_for_training_from <= T`, not a re-computation. Two CSV files of
+  about 15,363 rows each replace what would otherwise have been ~170 datasets
+  per variant.
+
+Files created by this stage
+
+  scripts/preprocess_dataset_d.py
+      Stage 6A. Loads and structurally validates raw Dataset D, builds the
+      shared weekday calendar, forward-fills after inception per field, computes
+      adjusted-close daily log returns, validates (no pre-inception fill, no
+      post-inception gaps, identical inceptions across fields, DRE treatment, M6
+      anchors present, KR anomaly still present, raw file hash unchanged), and
+      writes the processed panels, the per-asset summary and the report.
+
+  scripts/build_feature_baseline_dataset.py
+      Stage 6B. The origin grid, the causal KNN imputation, the ten predictors,
+      the four-week target and quintile labels, both variants, all validation,
+      the build summary and the report. CLI: `--variant {no_knn,knn}` (default:
+      both). Contains no `.shift()` call anywhere; every window is a closed-form
+      slice in origin coordinates.
+
+  tests/test_build_feature_baseline_dataset.py
+      16 focused tests: calendar shape; grid spacing/Friday/floor/tuning/M6
+      identity; feature-window arithmetic; the post-origin poisoning test;
+      rank-frequency bounds; dollar-volume aggregate equivalence and zero-volume
+      handling; the cumulative-vs-lagged target distinction; quintile direction
+      and membership normalisation; causal KNN behaviour; and integration checks
+      on the generated artifacts. All 16 pass; the project suite is 63 passing.
+
+  Data/processed/dataset_d/dataset_d_{open,high,low,close,adjusted_close,
+                                      volume}_weekday.csv
+      The six processed field panels. 3,676 weekday rows x 100 assets, official
+      column order, forward-filled after inception.
+  Data/processed/dataset_d/dataset_d_daily_log_returns.csv
+      Adjusted-close daily log returns on the same index. This is the input to
+      both variants.
+
+  Data/metadata/dataset_d_preprocessing_summary.csv
+      One row per asset: inception/last dates, genuine observation count,
+      leading missing weekdays, forward-filled weekdays, first valid return
+      date, valid/missing return counts, raw and processed zero-volume day
+      counts.
+
+  Data/metadata/m6_asset_metadata.csv
+      The 100-asset metadata table described in section AH.
+
+  Data/metadata/feature_baseline_origin_schedule.csv
+      The 170-origin grid: origin_index, origin_date, target_start_date,
+      target_end_date, m6_round, origin_role (historical / tuning / m6),
+      eligible_for_training_from.
+
+  Data/processed/feature_baseline/supervised_rows_no_knn.csv
+  Data/processed/feature_baseline/supervised_rows_knn.csv
+      The two supervised datasets. 15,363 rows x 35 columns each. Columns:
+        variant, origin_date, target_start_date, target_end_date,
+        eligible_for_training_from, origin_role, m6_round,
+        symbol, official_order, asset_type, sector_or_etf_type, asset_class,
+        asset_inception_date,
+        the ten feat_* predictors,
+        features_complete, n_missing_features,
+        hist_target_log_return, hist_target_simple_return,
+        hist_target_quintile, hist_target_Rank1..Rank5,
+        hist_target_cross_section_size, hist_target_available.
+
+  Data/metadata/feature_baseline_build_summary.csv
+      Per-variant row/origin/completeness counts and per-feature missing counts.
+
+  reports/dataset_d_preprocessing_report.md
+  reports/feature_baseline_dataset_report.md
+      Generated evidence for the two stages.
+
+  documentation_part2.txt
+      This section.
+
+Files MODIFIED by this stage
+  None, apart from this documentation file. Every artifact above is new. Git
+  confirms that `Relevant Context/`, `documentation.txt`, `Data/raw/`,
+  `Data/processed/dataset_a_*`, `Data/processed/rolling_origins/`,
+  `Data/assets_m6.csv`, `scripts/evaluate_m6_rps.py`, all other existing scripts
+  and all `Results/` outputs are unchanged.
+
+How the model stage should consume this
+  1. Read `Data/metadata/feature_baseline_origin_schedule.csv` to get the 12
+     tuning origins and the 12 M6 origins.
+  2. Choose a variant and read the corresponding `supervised_rows_*.csv`.
+  3. To build the training set for a model cutoff T (a tuning origin or an M6
+     origin), filter:
+         eligible_for_training_from <= T   AND   hist_target_available
+     plus whatever feature-completeness policy the model requires
+     (`features_complete` for Random Forest, which cannot consume NaN; LightGBM
+     can use rows with missing features directly, and that choice should itself
+     be documented).
+  4. Fit on the ten `feat_*` columns (plus `asset_class` if the model-stage
+     decision in section AH says so) against `hist_target_quintile`.
+  5. Predict the row(s) whose `origin_date == T`, producing five quintile
+     probabilities per asset.
+  6. Score ONLY through `scripts/evaluate_m6_rps.py` against the official ground
+     truth. Never against `hist_target_*`.
+
+Reproducing
+    python scripts/preprocess_dataset_d.py                      (~10 s)
+    python scripts/build_feature_baseline_dataset.py            (~7 min)
+    python -m pytest tests/test_build_feature_baseline_dataset.py
+
+--------------------------------------------------------------------------------
+AO. VALIDATION PERFORMED
+--------------------------------------------------------------------------------
+
+Data integrity
+  - Raw Dataset D SHA-256 hashed before and after the preprocessing run;
+    unchanged. Git reports `Data/raw/` entirely unmodified.
+  - KR was NOT altered and is NOT special-cased anywhere in the code. The
+    preprocessing validator asserts the KR anomaly is STILL present (its
+    2022-10-21 adjusted-close log return measures 0.2113 and the run fails if it
+    falls below 0.15), which makes accidental repair impossible to miss.
+  - Dataset C untouched (not read, not written).
+  - No file inside `Relevant Context/` was modified or written to; git reports
+    the directory clean. No project module imports from it.
+  - `documentation.txt` untouched.
+
+Calendar
+  - 3,676 Monday-to-Friday dates, 2009-01-02 .. 2023-02-03, unique, sorted, no
+    weekends; asserted.
+  - Forward fill: for every asset and every one of the six fields, asserted that
+    no value exists strictly before that asset's first genuine observation and
+    that no gap remains after it. No backward filling anywhere.
+  - Asserted that all six fields agree on every asset's inception date.
+  - DRE: asserted final genuine observation is 2022-10-03, price constant
+    thereafter, and every subsequent log return exactly zero.
+  - All 13 M6 Friday anchors present.
+
+Returns
+  - `r = log(P_t/P_{t-1})` on adjusted close; no infinities; positive prices
+    asserted on input.
+  - Raw close is never used for any return quantity, so split jumps cannot enter
+    as investment returns; the only place raw close appears is the dollar-volume
+    product, where it is correct.
+
+Outliers
+  - No ECOD, no winsorisation, no clipping, no percentile capping anywhere in
+    the code (verified by inspection; the pipeline imports only pandas, numpy
+    and `sklearn.impute.KNNImputer`).
+  - Genuine extremes survive: the extreme rows listed in section AB are present
+    in the built datasets.
+
+Origin frequency
+  - Asserted that the set of gaps between consecutive classifier origins is
+    exactly {28 days}, in the grid AND independently in each written dataset.
+  - Asserted every origin is a Friday.
+  - 170 origins over a 13-year span - one per four weeks, not one per weekday.
+    No two supervised rows share an overlapping four-week target window.
+  - Daily observations appear only inside feature and target windows.
+
+Target
+  - Asserted `target_start` is the weekday immediately after the origin and
+    `target_end` is exactly 20 weekdays after it, for every origin.
+  - 400 randomly sampled rows per variant recomputed against the direct sum of
+    the next 20 daily returns; exact agreement.
+  - Asserted the target quintile is monotone non-decreasing in the realised
+    return within every origin, with the worst asset in quintile 0 and the best
+    in quintile 4 — i.e. the direction matches the official evaluator.
+  - A unit test asserts the target is NOT equal to the return 20 days ahead, so
+    the released repository's daily-return label cannot have been reproduced by
+    accident.
+  - Membership vectors sum to 1.
+
+Feature alignment
+  - Every window is a closed-form slice relative to the origin index; there is
+    no `.shift()` in the feature code.
+  - 60 random real rows x 10 features = 600 independent first-principles
+    recomputations, all matching to rtol 1e-9.
+  - A poisoning test overwrites all post-origin data and asserts feature
+    equality.
+
+KNN
+  - Predictor leakage test at 2021-03-05: identical under post-origin
+    corruption; changes under in-window corruption.
+  - Target leakage test: identical under post-target_end corruption; changes
+    under in-window corruption.
+  - Unit test: an asset with no history at the cutoff is left entirely missing.
+  - Unit test: the imputed frame has exactly cutoff+1 rows.
+  - Branch labels were NOT forced to match; 40 of 15,363 differ and the
+    difference is reported rather than removed.
+
+M6
+  - Asserted the forward grid reproduces `Data/metadata/m6_round_schedule.csv`
+    exactly (origins, target starts, target ends).
+  - `scripts/evaluate_m6_rps.py`, `Data/assets_m6.csv` and all `Results/`
+    outputs unchanged; the existing evaluator test suite still passes.
+
+Normalization
+  - No standardisation or scaling of any predictor; the stored values are the
+    engineered values (verifiable from the reported feature means/ranges, which
+    are on their natural scales, e.g. `feat_dollar_volume_2m` ~ 465).
+
+Suite
+  - 63 tests pass across the whole project, including the 16 new ones and the
+    pre-existing Stage 2/3/5 tests.
+
+--------------------------------------------------------------------------------
+AP. LIMITATIONS AND DEVIATIONS FROM SAMARTZIS
+--------------------------------------------------------------------------------
+
+Deliberate methodological deviations
+  1. NO ECOD, NO WINSORISATION. Genuine extreme returns are retained
+     (section AB).
+  2. ADJUSTED CLOSE, not raw close, for all return quantities; LOG returns, not
+     simple returns (section AC). Raw close is retained only where it is
+     economically correct, inside the dollar-volume product.
+  3. THE PAPER'S TARGET, not the released code's. The label is the
+     cross-sectional quintile of the realised cumulative FOUR-WEEK return, not
+     the quintile of a single daily return (section AE).
+  4. CAUSAL KNN. The released code fits one imputer to the entire sample before
+     backtesting; here the KNN fit is re-done per origin with an explicit
+     information cutoff (section AK).
+  5. SOURCE INDEXING TRANSLATED, NOT COPIED. `.shift(20)` / `.shift(220)` are
+     not reproduced; every window is restated in forecast-origin coordinates,
+     which also removes the released code's one-day look-ahead in its rolling
+     features (section AF).
+  6. THE PAPER'S FINAL FEATURE SET ONLY. The code-only quarterly-return `feat_5`
+     and the four intraday/volume-change candidates are excluded (section AH).
+  7. TIE-AWARE QUINTILES from this project's official evaluator instead of
+     `pd.qcut`, everywhere a cross-sectional quintile is formed.
+  8. [WITHDRAWN - see section AR] A local zero-volume rule was originally used
+     in place of the released behaviour. It was reconsidered and removed, so
+     the zero-volume handling is now the released Samartzis behaviour exactly
+     and is NOT a deviation.
+  9. NO GLOBAL NORMALISATION for RF/LGBM inputs (section AL).
+
+Known limitations
+  a. THE KR ADJUSTED-CLOSE PROVIDER DEFECT IS PRESENT, by decision. It
+     contaminates a handful of KR's own features and its Dataset-D historical
+     label for the origin 2022-10-14. It does not touch the official evaluation
+     (section Z).
+  b. DATASET D IS SINGLE-PROVIDER, and adjusted closes are recomputed
+     retrospectively by providers, so a future re-download may not reproduce
+     these numbers exactly. The KR break is a concrete illustration of that
+     fragility.
+  c. THE ILLIQUIDITY FEATURE IS UNSTABLE FOR VERY THIN ASSETS. Because the
+     released formula divides by a LOG-scale aggregate, the denominator can
+     approach zero: 11 of 15,363 rows have D40 < 40 and one has D40 <= 0
+     (VXX, 2018-06-01 origin), producing values two orders of magnitude larger
+     than typical and, in that one row, of the wrong sign. This is inherited
+     from the source construction and was preserved rather than redesigned. The
+     model stage may wish to consider it.
+  d. SOME REPORTED VOLUMES ARE IMPLAUSIBLY SMALL. EODHD reports single- and
+     double-digit daily share counts for SEGA.LSE throughout, and for VXX.US in
+     2018. These are likely single-venue prints rather than consolidated tape.
+     The values were retained (Dataset D is used as acquired), but any
+     conclusion that leans on the two volume features for those assets should be
+     treated cautiously.
+  e. KNN FABRICATES PRE-INCEPTION RETURN HISTORY in the "knn" branch. That is
+     precisely the thing the no-KNN branch exists to test, and the causal scheme
+     confines it (an asset with no history at its own origin gets no row at
+     all), but it is a fabrication and should be described as such in the
+     report. It is the direct source of the KNN branch's 199 extra usable rows.
+  f. THE TARGET CROSS-SECTION CONVENTION IS REVERSIBLE. Including
+     imputable-but-not-yet-listed assets in the KNN branch's target ranking
+     (section AE) is what produces the 40 differing labels. Restricting the
+     ranking to assets that existed at the origin would make the two branches'
+     labels identical and is a defensible alternative. Flagged rather than
+     silently chosen.
+  g. THE 2010 FLOOR plus the 220-weekday lookback means the earliest origin is
+     2010-01-22 and early origins rank only 77-84 assets. Quintile boundaries
+     are computed from the actual cross-section size, so this is handled
+     correctly, but early-period labels are formed over a smaller universe than
+     the M6 rounds.
+  h. THE UNIVERSE IS THE FIXED M6 LIST, carrying that list's survivorship
+     characteristics.
+  i. THE PAPER PDF IS NOT IN THIS REPOSITORY. The paper's methodology was taken
+     from the project specification and cross-checked against the released code
+     and README; the final feature list in section AG is the paper's reported
+     set as specified. If the PDF becomes available, section AG's feature list
+     and the seasonality window in particular should be re-verified against it.
+
+--------------------------------------------------------------------------------
+AQ. WHAT THIS STAGE DID NOT DO
+--------------------------------------------------------------------------------
+
+Not performed, and left for the modelling stage:
+  - Random Forest or LightGBM training;
+  - HyperOpt or any other hyperparameter optimisation (the 12 tuning origins are
+    prepared, nothing was tuned);
+  - the decision on whether RF and/or LGBM consume `asset_class` (section AH);
+  - the decision on how each model handles rows with missing features (RF cannot
+    take NaN; LightGBM can);
+  - the expanding/rolling training procedure's exact form beyond the eligibility
+    rule `target_end(t) <= T`;
+  - forecast generation;
+  - RPS evaluation.
+
+The documentation standard fixed in section X still applies to that stage.
+
+================================================================================
+END OF STAGE 6 — append future stages below this line's section style.
+================================================================================
+
+--------------------------------------------------------------------------------
+AR. CORRECTION — THE ZERO-VOLUME RULE WAS REPLACED BY THE RELEASED SAMARTZIS
+    BEHAVIOUR (applied 2026-08-21)
+--------------------------------------------------------------------------------
+
+Supersedes: the "local rule adopted" paragraph of section AI, deviation 8 of
+section AP, and the affected counts in sections AD and AJ. Everything else in
+Stage 6 stands unchanged.
+
+What was reconsidered
+  Stage 6 originally adopted a custom treatment for zero/nonpositive dollar
+  volume: invalid days were dropped from the 40-day aggregate, which was
+  computed as the mean of the available days rescaled by 40 (>= 20 of 40
+  required), and the 60-day absolute-return-to-volume feature required only
+  30 of its 60 terms. That was a deviation from the released implementation,
+  which lets log(0) become -inf and destroys any window containing it.
+
+Evidence gathered (read-only check, `check/zero_volume_method_check.txt`,
+a temporary artifact not part of the pipeline)
+  The two treatments were computed side by side over all 15,363 supervised rows
+  with every other methodological decision held fixed:
+    - missing feat_dollar_volume_2m      : 113 (0.74%) -> 382 (2.49%)
+    - missing feat_abs_ret_to_volume_3m  : 147 (0.96%) -> 521 (3.39%)
+    - fully usable rows, no_knn          : 15,006 -> 14,739  (-267, -1.78%)
+    - fully usable rows, knn             : 15,205 -> 14,842  (-363, -2.39%)
+    - M6 prediction rows with a missing volume feature: 3 -> 28 of 1,200
+    - no origin is lost in any scope (170 / 145 / 158 origins unchanged)
+  The loss is concentrated, not broad: in the no-KNN branch 11 assets are
+  affected and SEGA.L (87), IEFM.L (61) and HIGH.L (29) account for 66% of the
+  lost rows; eight of the eleven are the thinly traded London-listed ETFs.
+  Mechanism: one invalid day removes up to 40 consecutive 40-day aggregates,
+  and each removed aggregate removes up to 60 consecutive ratio terms, so a
+  single zero-volume day can suppress the ratio feature for ~99 weekdays.
+
+Decision
+  The released Samartzis behaviour is adopted exactly. The custom rule is
+  withdrawn. This makes the zero-volume handling faithful to the source rather
+  than an adaptation, at the cost of ~1.8% (no_knn) / ~2.4% (knn) of usable
+  training rows and 28 of 1,200 M6 prediction rows carrying a missing volume
+  feature.
+
+Implementation now in force
+      LDV_j = log(V_j * C_j / 1000)          undefined -> missing
+      D40_t = STRICT 40-day rolling sum of LDV over [t-39, t]
+              (min_periods == window, so any invalid day, or fewer than 40
+               weekdays since inception, leaves it undefined)
+      feat_abs_ret_to_volume_3m
+            = STRICT 60-day sum over j in [t-59, t] of |r_j| / D40_j
+  Marking an invalid day as missing and summing strictly is arithmetically
+  identical to the released `-inf` propagation followed by
+  `.replace([inf, -inf], nan)`; verified over the full panel (identical NaN
+  pattern, identical finite values, 50,301 undefined cells either way), and
+  asserted by a unit test that compares against the literal source expression.
+  The established forecast-origin alignment is unchanged: the windows are still
+  [t-39, t] and [t-59, t] with t included, so the released `.shift(20)`
+  indexing issue is NOT reintroduced.
+
+Resulting counts (both branches, 15,363 rows over 170 origins)
+    missing feat_dollar_volume_2m         382 (2.49%)   identical in both
+    missing feat_abs_ret_to_volume_3m     521 (3.39%)   identical in both
+    fully usable rows   no_knn 14,739     knn 14,842
+    usable at the first tuning origin (2021-03-05): 12,299 / 12,396
+    usable at the first M6 origin (2022-03-04):     13,568 / 13,670
+    M6 prediction rows with a missing volume feature: 28 of 1,200, in all 12
+      rounds, involving only SEGA.L, IEFM.L, HIGH.L and DRE
+  The model stage must now decide explicitly how each model treats those rows:
+  LightGBM consumes missing values natively; Random Forest cannot.
+
+Exactly which features changed
+  ONLY `feat_dollar_volume_2m` and `feat_abs_ret_to_volume_3m`. Confirmed
+  unchanged after the rebuild: all 15,363 rows over all 170 origins; the other
+  eight predictors' missing counts (24 / 284 / 73 / 73 / 24 / 24 / 24 / 24 in
+  no_knn, 0 in knn); the target quintile distribution
+  (3,003 / 3,081 / 3,069 / 3,081 / 3,129); the 40 rows where the two branches'
+  labels differ; the branch label agreement 0.9974; and
+  `feature_baseline_origin_schedule.csv` (byte-identical, same SHA-256).
+
+Files changed by this correction
+  modified    scripts/build_feature_baseline_dataset.py
+              tests/test_build_feature_baseline_dataset.py
+  regenerated Data/processed/feature_baseline/supervised_rows_no_knn.csv
+              Data/processed/feature_baseline/supervised_rows_knn.csv
+              Data/metadata/feature_baseline_build_summary.csv
+              reports/feature_baseline_dataset_report.md
+  Stage 6A (raw Dataset D, the processed panels, the preprocessing summary and
+  its report) was NOT re-run and is byte-identical. 66 project tests pass,
+  including the build's own origin-spacing, target, feature-window (600
+  first-principles recomputations) and KNN leakage validations.
+
+================================================================================
+END OF STAGE 6 CORRECTION
+================================================================================

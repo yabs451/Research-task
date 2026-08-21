@@ -1,0 +1,3 @@
+variant,rows,origins,complete_feature_rows,rows_with_target,trainable_rows,missing_feat_ret_4w_recent,missing_feat_ret_4w_seasonal_11m,missing_feat_vol_3m,missing_feat_max_ret_3m,missing_feat_dollar_volume_2m,missing_feat_abs_ret_to_volume_3m,missing_feat_rank1_freq_4w,missing_feat_rank2_freq_4w,missing_feat_rank4_freq_4w,missing_feat_rank5_freq_4w
+no_knn,15363,170,14739,15363,14739,24,284,73,73,382,521,24,24,24,24
+knn,15363,170,14842,15363,14842,0,0,0,0,382,521,0,0,0,0

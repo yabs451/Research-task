@@ -1,0 +1,101 @@
+official_order,symbol,name,asset_type,sector_or_etf_type,asset_class
+1,ABBV,AbbVie,Stock,Health Care,Stocks
+2,ACN,Accenture,Stock,Information Technology,Stocks
+3,AEP,American Electric Power,Stock,Utilities,Stocks
+4,AIZ,Assurant,Stock,Financials,Stocks
+5,ALLE,Allegion,Stock,Industrials,Stocks
+6,AMAT,Applied Materials,Stock,Information Technology,Stocks
+7,AMP,Ameriprise Financial,Stock,Financials,Stocks
+8,AMZN,Amazon,Stock,Consumer Discretionary,Stocks
+9,AVB,AvalonBay Communities,Stock,Real Estate,Stocks
+10,AVY,Avery Dennison,Stock,Materials,Stocks
+11,AXP,American Express,Stock,Financials,Stocks
+12,BDX,Becton Dickinson,Stock,Health Care,Stocks
+13,BF-B,Brown-Forman,Stock,Consumer Staples,Stocks
+14,BMY,Bristol Myers Squibb,Stock,Health Care,Stocks
+15,BR,Broadridge Financial Solutions,Stock,Information Technology,Stocks
+16,CARR,Carrier Global,Stock,Industrials,Stocks
+17,CDW,CDW,Stock,Information Technology,Stocks
+18,CE,Celanese,Stock,Materials,Stocks
+19,CHTR,Charter Communications,Stock,Communication Services,Stocks
+20,CNC,Centene,Stock,Health Care,Stocks
+21,CNP,CenterPoint Energy,Stock,Utilities,Stocks
+22,COP,ConocoPhillips,Stock,Energy,Stocks
+23,CTAS,Cintas Corporation,Stock,Industrials,Stocks
+24,CZR,Caesars Entertainment,Stock,Consumer Discretionary,Stocks
+25,DG,Dollar General,Stock,Consumer Discretionary,Stocks
+26,DPZ,Domino's Pizza,Stock,Consumer Discretionary,Stocks
+27,DRE,Duke Realty Corporation,Stock,Real Estate,Stocks
+28,DXC,DXC Technology,Stock,Information Technology,Stocks
+29,EWA,iShares MSCI Australia ETF,ETF,Equities,Equities
+30,EWC,iShares MSCI Canada ETF,ETF,Equities,Equities
+31,EWG,iShares MSCI Germany ETF,ETF,Equities,Equities
+32,EWH,iShares MSCI Hong Kong ETF,ETF,Equities,Equities
+33,EWJ,iShares MSCI Japan ETF,ETF,Equities,Equities
+34,EWL,iShares Msci Switzerland ETF,ETF,Equities,Equities
+35,EWQ,iShares MSCI France ETF,ETF,Equities,Equities
+36,EWT,iShares Msci Taiwan ETF,ETF,Equities,Equities
+37,EWU,iShares MSCI United Kingdom ETF,ETF,Equities,Equities
+38,EWY,iShares Msci South Korea ETF,ETF,Equities,Equities
+39,EWZ,iShares Msci Brazil ETF,ETF,Equities,Equities
+40,FTV,Fortive,Stock,Industrials,Stocks
+41,GOOG,Alphabet (Class C),Stock,Communication Services,Stocks
+42,GPC,Genuine Parts,Stock,Consumer Discretionary,Stocks
+43,GSG,iShares S&P GSCI Commodity-Indexed Trust ETF,ETF,Commodities,Commodities
+44,HIG,The Hartford,Stock,Financials,Stocks
+45,HIGH.L,iShares Public Limited Company - iShares Euro High Yield Corp Bond UCITS ETF,ETF,Fixed Income,Fixed Income
+46,HST,Host Hotels & Resorts,Stock,Real Estate,Stocks
+47,HYG,iShares iBoxx $ High Yield Corporate Bond ETF,ETF,Fixed Income,Fixed Income
+48,IAU,iShares Gold Trust,ETF,Commodities,Commodities
+49,ICLN,iShares Global Clean Energy ETF,ETF,Equities,Equities
+50,IEAA.L,iShares III Public Limited Company - iShares Core Euro Corporate Bond UCITS ETF,ETF,Fixed Income,Fixed Income
+51,IEF,iShares 7-10 Year Treasury Bond ETF,ETF,Fixed Income,Fixed Income
+52,IEFM.L,iShares IV Public Limited Company - iShares Edge MSCI Europe Momentum Factor UCITS ETF,ETF,Equities,Equities
+53,IEMG,iShares Core MSCI Emerging Markets ETF,ETF,Equities,Equities
+54,IEUS,iShares MSCI Europe Small-Cap ETF,ETF,Equities,Equities
+55,IEVL.L,iShares IV Public Limited Company - iShares Edge MSCI Europe Value Factor UCITS ETF,ETF,Equities,Equities
+56,IGF,iShares Global Infrastructure ETF,ETF,Equities,Equities
+57,INDA,iShares MSCI India ETF,ETF,Equities,Equities
+58,IUMO.L,iShares Edge MSCI USA Momentum Factor ETF,ETF,Equities,Equities
+59,IUVL.L,iShares IV Public Limited Company - iShares Edge MSCI USA Value Factor UCITS ETF,ETF,Equities,Equities
+60,IVV,iShares Core S&P 500 ETF,ETF,Equities,Equities
+61,IWM,iShares Russell 2000 ETF,ETF,Equities,Equities
+62,IXN,iShares Global Tech ETF,ETF,Equities,Equities
+63,JPEA.L,iShares II Public Limited Company - iShares J.P. Morgan $ Emerging Markets Bond UCITS ETF,ETF,Fixed Income,Fixed Income
+64,JPM,JPMorgan Chase,Stock,Financials,Stocks
+65,KR,Kroger,Stock,Consumer Staples,Stocks
+66,LQD,iShares iBoxx $ Inv Grade Corporate Bond ETF,ETF,Fixed Income,Fixed Income
+67,MCHI,iShares MSCI China ETF,ETF,Equities,Equities
+68,META,Meta Platforms,Stock,Communication Services,Stocks
+69,MVEU.L,iShares VI Public Limited Company - iShares Edge MSCI Europe Minimum Volatility UCITS ETF,ETF,Equities,Equities
+70,OGN,Organon & Co.,Stock,Health Care,Stocks
+71,PG,Procter & Gamble,Stock,Consumer Staples,Stocks
+72,PPL,PPL,Stock,Utilities,Stocks
+73,PRU,Prudential Financial,Stock,Financials,Stocks
+74,PYPL,PayPal,Stock,Information Technology,Stocks
+75,RE,Everest Re,Stock,Financials,Stocks
+76,REET,iShares Global REIT ETF,ETF,Equities,Equities
+77,ROL,Rollins,Stock,Industrials,Stocks
+78,ROST,Ross Stores,Stock,Consumer Discretionary,Stocks
+79,SEGA.L,iShares III Public Limited Company - iShares Core Euro Government Bond UCITS ETF,ETF,Fixed Income,Fixed Income
+80,SHY,iShares 1-3 Year Treasury Bond ETF,ETF,Fixed Income,Fixed Income
+81,SLV,iShares Silver Trust,ETF,Commodities,Commodities
+82,SPMV.L,iShares VI Public Limited Company - iShares Edge S&P 500 Minimum Volatility UCITS ETF,ETF,Equities,Equities
+83,TLT,iShares 20 Plus Year Treasury Bond ETF,ETF,Fixed Income,Fixed Income
+84,UNH,UnitedHealth Group,Stock,Health Care,Stocks
+85,URI,United Rentals,Stock,Industrials,Stocks
+86,V,Visa,Stock,Information Technology,Stocks
+87,VRSK,Verisk Analytics,Stock,Industrials,Stocks
+88,VXX,iPath Series B S&P 500 VIX Short-Term Futures ETN,ETF,Volatility,Volatility
+89,WRK,WestRock,Stock,Materials,Stocks
+90,XLB,Materials Select Sector SPDR Fund,ETF,Equities,Equities
+91,XLC,Communication Services Select Sector SPDR Fund,ETF,Equities,Equities
+92,XLE,Energy Select Sector SPDR Fund,ETF,Equities,Equities
+93,XLF,Financial Select Sector SPDR Fund,ETF,Equities,Equities
+94,XLI,Industrial Select Sector SPDR Fund,ETF,Equities,Equities
+95,XLK,Technology Select Sector SPDR Fund,ETF,Equities,Equities
+96,XLP,Consumer Staples Select Sector SPDR Fund,ETF,Equities,Equities
+97,XLU,Utilities Select Sector SPDR Fund,ETF,Equities,Equities
+98,XLV,Health Care Select Sector SPDR Fund,ETF,Equities,Equities
+99,XLY,Consumer Discretionary Select Sector SPDR Fund,ETF,Equities,Equities
+100,XOM,ExxonMobil,Stock,Energy,Stocks

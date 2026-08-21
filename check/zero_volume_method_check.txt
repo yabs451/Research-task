@@ -1,0 +1,300 @@
+================================================================================
+READ-ONLY METHODOLOGICAL CHECK — ZERO-VOLUME TREATMENT IN THE VOLUME FEATURES
+Current implementation vs. exact Samartzis-style behaviour
+Generated 2026-08-21. TEMPORARY ARTIFACT. Nothing in the project was changed.
+================================================================================
+
+SCOPE AND METHOD
+----------------
+This compares ONLY the zero/nonpositive-volume handling. Everything else is held
+fixed: the same processed Dataset D panels, the same shared weekday calendar and
+forward-fill policy, the same 170 four-week Friday forecast origins, the same
+forecast-origin window alignment (the released .shift(20) indexing issue is NOT
+reintroduced), the same log-return conventions, the same other eight features,
+the same targets.
+
+  CURRENT behaviour (what is implemented today)
+      LDV_j  = log(V_j * C_j / 1000), undefined -> MISSING (not -inf)
+      D40_t  = 40 * mean(LDV over available days in [t-39, t]),
+               needs >= 20 of 40 available, and >= 40 weekdays since inception
+      feat_abs_ret_to_volume_3m
+             = 60 * mean over j in [t-59, t] of (|r_j| / D40_j),
+               needs >= 30 of 60 terms
+
+  SOURCE-STYLE behaviour (exact Samartzis zero-volume semantics)
+      feat_3 = np.log(volume * close / 1000)          -> -inf on zero volume
+      feat_3 = feat_3.rolling(40).sum()               -> -inf if ANY day invalid
+                     .replace([inf,-inf], np.nan)     -> NaN
+      feat_4 = (returns.abs() / feat_3).rolling(60).sum()   -> strict, NaN-prop
+      i.e. one invalid day destroys the whole aggregate.
+
+  Implementation note: -inf was modelled exactly but computed safely, as
+  "strict rolling(40).sum() over the finite values, set to NaN wherever the
+  window contains >= 1 invalid day". This is arithmetically identical to letting
+  -inf propagate and then replacing it, without float-inf edge cases in pandas.
+
+  Sanity check performed: the recomputed CURRENT feature values reproduce the
+  stored columns in supervised_rows_no_knn.csv exactly (assert passed), so the
+  source-style figures below are measured against a verified baseline.
+
+  Row universe: the 15,363 supervised (origin, asset) rows over 170 origins,
+  identical in both preprocessing branches. The two volume features are
+  branch-independent (KNN never touches volume), so their missing counts are the
+  same in both branches; the branches differ only in how many rows the OTHER
+  eight features complete, which is why the "rows lost" totals differ.
+
+
+1. MISSING VALUES UNDER SOURCE-STYLE BEHAVIOUR (of 15,363 rows)
+---------------------------------------------------------------
+  feat_dollar_volume_2m          382 missing   (2.49%)
+  feat_abs_ret_to_volume_3m      521 missing   (3.39%)
+
+
+2. MISSING VALUES UNDER THE CURRENT IMPLEMENTATION (of 15,363 rows)
+-------------------------------------------------------------------
+  feat_dollar_volume_2m          113 missing   (0.74%)
+  feat_abs_ret_to_volume_3m      147 missing   (0.96%)
+
+  Difference: +269 missing dollar-volume values (x3.4), +374 missing
+  absolute-return-to-volume values (x3.5).
+
+  Panel-level view (all 328,020 post-inception asset-days, not just origins):
+  the 40-day dollar-volume aggregate is undefined on 10,721 asset-days under
+  source-style behaviour versus 5,323 under the current rule — roughly double.
+
+
+3. SUPERVISED ROWS THAT WOULD BECOME UNUSABLE
+---------------------------------------------
+"Unusable" = a row whose other eight features are all present and which is
+currently fully complete, but which would lose at least one of the two volume
+features under source-style behaviour.
+
+  no_knn branch : 15,006 currently complete -> 14,739  |  267 lost (1.78%)
+  knn branch    : 15,205 currently complete -> 14,842  |  363 lost (2.39%)
+
+  The knn branch loses more because KNN imputation completes the other eight
+  features for many late-listing assets, so more rows are exposed to the volume
+  features being the sole binding constraint.
+
+  Note: no ORIGIN is lost in either branch (170 -> 170 origins retain at least
+  one usable row); the loss is entirely at the asset-row level.
+
+
+4. LOST ROWS BY ASSET
+---------------------
+Highly concentrated, not broadly distributed.
+
+  no_knn branch — 11 assets affected, 267 rows:
+      SEGA.L   87
+      IEFM.L   61
+      HIGH.L   29
+      SPMV.L   26
+      IEVL.L   23
+      IEAA.L   17
+      JPEA.L    9
+      IUVL.L    6
+      CNC       5
+      CHTR      3
+      DRE       1
+    Top 3 assets (SEGA.L, IEFM.L, HIGH.L) account for 66.3% of all lost rows.
+    Eight of the eleven are London-listed ETFs. Only three US names appear
+    (CNC 5, CHTR 3, DRE 1), and all three have very few zero-volume days.
+
+  knn branch — 29 assets affected, 363 rows:
+      SEGA.L 87, IEFM.L 69, HIGH.L 37, SPMV.L 34, IEAA.L 25, IEVL.L 24,
+      JPEA.L 16, IUVL.L 13, CHTR 11, MCHI 7, VXX 6, CNC 5, then 2 rows each for
+      FTV, XLC, CARR, OGN, IUMO.L, VRSK, DG, REET, MVEU.L, ABBV, META, INDA,
+      and 1 row each for PYPL, ALLE, CDW, IEMG, DRE.
+    Still concentrated: the same eight London ETFs plus CHTR account for 316 of
+    363 rows (87%); the long tail of 1-2 row assets is the inception-ramp effect
+    described in section 7c.
+
+
+5. EFFECT BY SCOPE
+------------------
+  Scope                                    Branch  Current  Source  Lost   %
+  ---------------------------------------------------------------------------
+  Full historical supervised dataset       no_knn   15,006  14,739   267  1.78
+  (170 origins, 2010-01-22 .. 2023-01-06)  knn      15,205  14,842   363  2.39
+
+  Training set at 1st tuning origin        no_knn   12,523  12,299   224  1.79
+  (2021-03-05; 145 origins eligible)       knn      12,714  12,396   318  2.50
+
+  Training set at 1st M6 origin            no_knn   13,810  13,568   242  1.75
+  (2022-03-04; 158 origins eligible)       knn      14,008  13,670   338  2.41
+
+  The proportional effect is essentially constant across scopes (~1.8% no_knn,
+  ~2.4% knn). Origin coverage is unchanged in every scope (145 -> 145,
+  158 -> 158, 170 -> 170).
+
+
+6. THE 12 M6 PREDICTION ORIGINS
+-------------------------------
+These are the rows the models must actually score, so a missing feature here is
+a prediction-time problem, not just a training-sample problem.
+
+  Total M6 prediction rows: 1,200 (12 origins x 100 assets)
+    rows with either volume feature missing, CURRENT      :  3
+    rows with either volume feature missing, SOURCE-STYLE : 28
+
+  Only four assets are involved: SEGA.L, IEFM.L, HIGH.L, DRE.
+  Under the CURRENT rule only DRE is affected (rounds 9-11, its post-acquisition
+  forward-filled zero-volume tail).
+
+  Round-by-round under source-style ("dv" = feat_dollar_volume_2m missing,
+  "ar" = feat_abs_ret_to_volume_3m missing):
+
+    Round  Asset    dv     ar
+      1    SEGA.L   yes    yes
+      2    SEGA.L   yes    yes
+      3    SEGA.L   yes    yes
+      4    SEGA.L   yes    yes
+      5    IEFM.L   yes    yes
+      5    SEGA.L   yes    yes
+      6    IEFM.L   yes    yes
+      6    SEGA.L   yes    yes
+      7    HIGH.L   yes    yes
+      7    IEFM.L   no     yes
+      7    SEGA.L   yes    yes
+      8    HIGH.L   yes    yes
+      8    IEFM.L   no     yes
+      8    SEGA.L   yes    yes
+      9    DRE      yes    yes
+      9    HIGH.L   no     yes
+      9    IEFM.L   no     yes
+      9    SEGA.L   yes    yes
+     10    DRE      yes    yes
+     10    HIGH.L   no     yes
+     10    SEGA.L   yes    yes
+     11    DRE      yes    yes
+     11    HIGH.L   no     yes
+     11    IEFM.L   yes    yes
+     11    SEGA.L   yes    yes
+     12    DRE      yes    yes
+     12    IEFM.L   yes    yes
+     12    SEGA.L   yes    yes
+
+  Per-round counts (source-style): R1 1, R2 1, R3 1, R4 1, R5 2, R6 2, R7 3,
+  R8 3, R9 4, R10 3, R11 4, R12 3.
+
+  SEGA.L would be affected in all 12 rounds. Every round is affected.
+  Note the "no / yes" rows: the ratio feature is lost more often than the
+  dollar-volume feature, because it inherits every poisoned denominator over a
+  further 60-day window (see 7b).
+
+
+7. WHY VALUES GO MISSING UNDER SOURCE-STYLE BEHAVIOUR
+-----------------------------------------------------
+
+7a. TRACE — SEGA.L at the M6 Round 1 origin, 2022-03-04
+    (feat_dollar_volume_2m: defined today, NaN under source-style)
+
+    40-weekday window: 2022-01-10 .. 2022-03-04
+    Zero-volume days in that window: 15 of 40
+      first three: 2022-01-12, 2022-01-19, 2022-01-20
+
+        date        raw close   volume   volume*close/1000   log(.)
+        2022-01-12   108.405      0            0.0           -inf
+        2022-01-19   107.690      0            0.0           -inf
+        2022-01-20   107.585      0            0.0           -inf
+
+    Step by step:
+      zero volume
+        -> volume * close / 1000 = 0
+        -> log(0) = -inf                                (invalid value)
+        -> rolling(40).sum() over the window = -inf     (one term dominates)
+        -> .replace([inf,-inf], nan) = NaN              (feature lost)
+        -> the row loses 1 of its 10 predictors
+
+    Values:
+      feat_dollar_volume_2m  SOURCE-STYLE = NaN
+      feat_dollar_volume_2m  CURRENT      = 82.4038
+                                          = 40 x mean of the 25 available days
+                                          = 40 x 2.0601
+
+    Downstream, same row:
+      the 60-day ratio window 2021-12-13 .. 2022-03-04 needs a denominator D40_j
+      for each of its 60 days. Under source-style ALL 60 of those denominators
+      are NaN (SEGA.L has zero-volume days throughout that stretch), so the
+      strict rolling(60).sum() is NaN and feat_abs_ret_to_volume_3m is lost too.
+
+      => row (2022-03-04, SEGA.L) has 2 of 10 features missing under
+         source-style, and is fully complete under the current rule.
+
+7b. TRACE — IEFM.L at the M6 Round 7 origin, 2022-08-19
+    (dollar-volume feature survives, ratio feature is still lost)
+
+    Its own 40-day window 2022-06-27 .. 2022-08-19 happens to contain no
+    zero-volume day, so feat_dollar_volume_2m = 301.7552 under BOTH rules.
+
+    But the ratio feature needs D40_j for every j in 2022-05-30 .. 2022-08-19,
+    and 50 of those 60 days have their OWN 40-day window reaching back into the
+    earlier zero-volume stretch (first such day: 2022-06-08). Under source-style
+    those 50 denominators are NaN, the strict rolling(60).sum() propagates NaN,
+    and feat_abs_ret_to_volume_3m is lost while the dollar-volume feature is
+    not.
+
+    Contamination radius: ONE invalid day poisons up to 40 consecutive D40
+    values, and each poisoned D40 poisons up to 60 consecutive ratio values, so
+    a single zero-volume day can remove the ratio feature for up to ~99
+    consecutive weekdays — roughly five four-week origins.
+
+7c. CONTAMINATION ARITHMETIC ON REAL ASSETS
+    (D40 undefined on post-inception weekdays; "current" figures include the
+    39-weekday inception ramp that both rules share)
+
+      asset    observed days   zero-vol days   D40 NaN source   D40 NaN current
+      SEGA.L        3,567            814            2,336              768
+      IEFM.L        2,100            566            1,615              322
+      HIGH.L        1,400            113              693               45
+      IEVL.L        2,100            280              706              359
+      SPMV.L        2,632             84              501               39
+      IEAA.L        1,400             70              377               41
+      CHTR          3,414             18              216               39
+      DRE           3,676             90              129              109
+      CNC           3,676              1               79               39
+
+    CNC is the cleanest illustration of the mechanism: it has exactly ONE
+    zero-volume day in fourteen years. Under the current rule its D40 is
+    undefined on 39 days (the inception ramp only). Under source-style it is
+    undefined on 79 days — the same 39, plus exactly 40 more, i.e. every window
+    that contains that single day. Those extra 40 weekdays span two four-week
+    origins, which is where CNC's 5 lost rows come from.
+
+    HIGH.L shows the compounding case: 113 zero-volume days remove 693 D40
+    values (about 6 per zero day, because the zero days are scattered rather
+    than clustered), versus 45 under the current rule.
+
+
+8. COMPACT COMPARISON TABLE
+---------------------------
+
+Metric                                          | Current implementation | Exact Samartzis-style behaviour | Difference
+------------------------------------------------|------------------------|---------------------------------|---------------------
+Missing feat_dollar_volume_2m (of 15,363 rows)  | 113 (0.74%)            | 382 (2.49%)                     | +269 (x3.4)
+Missing feat_abs_ret_to_volume_3m (of 15,363)   | 147 (0.96%)            | 521 (3.39%)                     | +374 (x3.5)
+D40 undefined, post-inception asset-days        | 5,323 of 328,020       | 10,721 of 328,020               | +5,398 (x2.0)
+Fully usable rows, no_knn (full dataset)        | 15,006                 | 14,739                          | -267 (-1.78%)
+Fully usable rows, knn (full dataset)           | 15,205                 | 14,842                          | -363 (-2.39%)
+Usable rows at 1st tuning origin, no_knn        | 12,523                 | 12,299                          | -224 (-1.79%)
+Usable rows at 1st tuning origin, knn           | 12,714                 | 12,396                          | -318 (-2.50%)
+Usable rows at 1st M6 origin, no_knn            | 13,810                 | 13,568                          | -242 (-1.75%)
+Usable rows at 1st M6 origin, knn               | 14,008                 | 13,670                          | -338 (-2.41%)
+Origins retaining usable rows                   | 170 / 145 / 158        | 170 / 145 / 158                 | unchanged
+M6 prediction rows with a missing volume feature| 3 of 1,200             | 28 of 1,200                     | +25 (x9.3)
+M6 rounds affected                              | 3 (rounds 9-11)        | 12 (all rounds)                 | +9 rounds
+Assets affected at M6 origins                   | 1 (DRE)                | 4 (SEGA.L, IEFM.L, HIGH.L, DRE) | +3 assets
+Assets losing training rows, no_knn             | -                      | 11 (8 London ETFs)              | 66% in top 3
+Assets losing training rows, knn                | -                      | 29 (87% in top 9)               | long thin tail
+
+
+9. WHAT THIS CHECK DOES NOT DO
+------------------------------
+No judgement is offered about which treatment is methodologically preferable.
+No implementation, dataset, documentation or test was changed. The current
+pipeline is untouched and still produces exactly the artifacts described in
+documentation_part2.txt section AI.
+
+================================================================================
+END OF CHECK
+================================================================================
