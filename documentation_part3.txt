@@ -1,0 +1,314 @@
+================================================================================
+M6 RESEARCH PROJECT - DOCUMENTATION, PART 3
+Held-out M6 evaluation of the finalized feature-based baselines.
+
+documentation.txt remains the record for Stages 1-5 (data acquisition through
+the TSFM M6 evaluation). documentation_part2.txt is the COMPLETED record of
+Dataset D acquisition, preprocessing, feature engineering and pre-M6
+hyperparameter tuning (Stages 6-7); it is closed and is not extended here.
+Part 3 begins with the held-out evaluation itself.
+================================================================================
+
+--------------------------------------------------------------------------------
+A. PURPOSE OF THE HELD-OUT EVALUATION
+--------------------------------------------------------------------------------
+
+Section P of Part 2 set out the question this stage exists to answer. Every
+time-series foundation model tested in Stages 1-5 was beaten by a forecast that
+simply assigns 0.2 to each quintile:
+
+    Naive equal-probability benchmark        0.160000
+    Chronos-2 120M + spatiotemporal copula   0.165418
+    Chronos-2 120M + independent sampling    0.165559
+    Financial Chronos Small 46M              0.179368
+    Chronos T5 Base 200M                     0.226899
+
+On its own that cannot distinguish two explanations:
+  (a) the M6 ranking task is close to unpredictable at this horizon, so nothing
+      much beats the uniform forecast - a statement about the TASK; or
+  (b) the TSFMs specifically are poorly suited to it, while conventional
+      feature-based learners do better - a statement about the MODELS.
+
+A competition-grade supervised baseline built for exactly this ranking task
+supplies the missing reference point. This stage produces it, on the same 12
+official M6 rounds, scored by the same evaluator, against the same ground truth.
+
+--------------------------------------------------------------------------------
+B. THE FOUR FROZEN CONFIGURATIONS
+--------------------------------------------------------------------------------
+
+No hyperparameter was tuned, reselected or adjusted in this stage. The four
+configurations were read verbatim from
+`Data/metadata/feature_baseline_tuning_results.csv`, the output of the pre-M6
+tuning stage (Part 2, section AT), and the evaluation script asserts on load
+that the stored feature list and random seed match the ones it will use.
+
+  RF / no_knn   criterion entropy, max_depth 7, max_features 0.5,
+                min_samples_leaf 5, min_samples_split 8, n_estimators 450
+  RF / knn      criterion gini, max_depth 8, max_features 0.5,
+                min_samples_leaf 6, min_samples_split 10, n_estimators 450
+  LGBM / no_knn num_leaves 192, learning_rate 0.037855, min_data_in_leaf 50,
+                subsample 0.716389, feature_fraction 0.610493, max_depth 5
+  LGBM / knn    num_leaves 432, learning_rate 0.032590, min_data_in_leaf 45,
+                subsample 0.814956, feature_fraction 0.826933, max_depth 5
+
+  Fixed alongside them, unchanged from tuning: the ten finalized predictors (no
+  AssetClass, no normalisation), seed 42, LightGBM's gbdt / multiclass /
+  multi_logloss / num_class 5 / linear_tree True / bagging_freq 1 with 50
+  boosting rounds, and native missing-value handling in both estimators
+  (scikit-learn 1.4.2, LightGBM 4.7.0).
+
+  VERIFIED AFTER THE RUN: for all four configurations the hyperparameter JSON
+  recorded in the evaluation output is byte-identical to the tuning winner.
+
+--------------------------------------------------------------------------------
+C. THE 12 M6 ORIGINS AND THE EVALUATION PROCEDURE
+--------------------------------------------------------------------------------
+
+Origins (forecast made at the Friday origin; the scored four-week period runs to
+the following grid Friday):
+
+   R1  2022-03-04 -> 2022-04-01      R7  2022-08-19 -> 2022-09-16
+   R2  2022-04-01 -> 2022-04-29      R8  2022-09-16 -> 2022-10-14
+   R3  2022-04-29 -> 2022-05-27      R9  2022-10-14 -> 2022-11-11
+   R4  2022-05-27 -> 2022-06-24      R10 2022-11-11 -> 2022-12-09
+   R5  2022-06-24 -> 2022-07-22      R11 2022-12-09 -> 2023-01-06
+   R6  2022-07-22 -> 2022-08-19      R12 2023-01-06 -> 2023-02-03
+
+  These are the project's existing official rounds. The script cross-checks the
+  M6 rows of `feature_baseline_origin_schedule.csv` against
+  `Data/metadata/m6_round_schedule.csv` and refuses to run if the origins or the
+  target ends disagree.
+
+Causal expanding retraining
+  At each origin T the training set is every row of that branch with
+  `eligible_for_training_from <= T`, i.e. whose own four-week outcome had
+  already been realised at T - exactly the rule used during tuning. The model is
+  REFITTED FROM SCRATCH at each of the 12 origins on the expanded history:
+
+      Round  1  (2022-03-04)  14,163 training rows
+      Round 12  (2023-01-06)  15,263 training rows
+
+  Earlier M6 rounds therefore become training rows for later rounds, which is
+  causally sound because by then their four-week outcome had occurred. Note
+  those rows carry this project's DATASET-D historical labels, never the
+  official M6 outcome; the official outcome never enters training in any form.
+
+  VERIFIED: across both branches and all 12 rounds, no training row had
+  `target_end_date > T`, no training row had `origin_date >= T`, and every round
+  predicted exactly 100 assets. At round 12 the latest training origin is
+  2022-12-09 with target end 2023-01-06 - the boundary, not beyond it.
+
+Probability post-processing and the validity rule
+  The released Samartzis cross-sectional adjustment is applied unchanged:
+
+      adjusted = raw + (0.2 - column_mean)
+
+  Each quintile column is shifted until its cross-sectional mean is 0.20; row
+  sums are preserved exactly. A forecast is valid when every entry lies in
+  [0, 1] and every row sums to 1 within 1e-9.
+
+  If a configuration produces an invalid adjusted probability at ANY round it is
+  STOPPED. Probabilities are never clipped or renormalised, no alternative
+  hyperparameter set is substituted, nothing is retuned, and no mean M6 RPS is
+  reported for it - a partial mean would misrepresent a model that cannot
+  produce valid forecasts across the held-out period. The other configurations
+  continue unaffected. This is the same infeasibility criterion used during
+  tuning (Part 2, section AS), applied here to a frozen model rather than to a
+  candidate.
+
+Scoring
+  The official ground truth is loaded only AFTER every forecast for a
+  configuration has been produced. It is built by the project's existing
+  `build_ground_truth(load_prices(), schedule)` from `Data/assets_m6.csv` and
+  scored with the project's existing `rps_scores`, both imported from
+  `scripts/evaluate_m6_rps.py`, which was not modified. Forecasts are aligned to
+  the ground truth's own per-round symbol order before scoring, so a mis-ordered
+  prediction cannot silently score against the wrong asset.
+
+--------------------------------------------------------------------------------
+D. RESULTS
+--------------------------------------------------------------------------------
+
+Round-by-round official M6 RPS (lower is better):
+
+| Round | RF / no_knn | RF / knn | LGBM / no_knn | Naive |
+|---|---:|---:|---:|---:|
+|  1 | 0.152391 | 0.151730 | 0.154639 | 0.16 |
+|  2 | 0.163481 | 0.164494 | 0.163415 | 0.16 |
+|  3 | 0.156677 | 0.156636 | 0.157601 | 0.16 |
+|  4 | 0.157956 | 0.157957 | 0.157803 | 0.16 |
+|  5 | 0.157312 | 0.157339 | 0.155983 | 0.16 |
+|  6 | 0.153349 | 0.153715 | 0.153561 | 0.16 |
+|  7 | 0.160408 | 0.160723 | 0.160946 | 0.16 |
+|  8 | 0.163029 | 0.162945 | 0.162089 | 0.16 |
+|  9 | 0.154518 | 0.153984 | 0.154219 | 0.16 |
+| 10 | 0.159017 | 0.159289 | 0.160185 | 0.16 |
+| 11 | 0.152990 | 0.153584 | 0.154484 | 0.16 |
+| 12 | 0.153505 | 0.153388 | 0.154253 | 0.16 |
+| **Mean** | **0.157053** | **0.157149** | **0.157432** | **0.160000** |
+
+  Rounds beating the naive benchmark: RF/no_knn 9/12, RF/knn 9/12,
+  LGBM/no_knn 8/12. Round 2 is the worst for all three (0.1634-0.1645) and
+  round 1 the best for both RF variants. Dispersion across rounds is small
+  (sd 0.0035-0.0041).
+
+  LGBM / knn: NO RESULT. See section E.
+
+Comparison with the naive M6 benchmark (0.160000)
+
+| Model | Mean M6 RPS | vs naive |
+|---|---:|---:|
+| RF / no_knn                             | 0.157053 | -0.002947 |
+| RF / knn                                | 0.157149 | -0.002851 |
+| LGBM / no_knn                           | 0.157432 | -0.002568 |
+| Naive equal-probability benchmark       | 0.160000 |  0.000000 |
+| Chronos-2 120M + spatiotemporal copula  | 0.165418 | +0.005418 |
+| Chronos-2 120M + independent sampling   | 0.165559 | +0.005559 |
+| Financial Chronos Small 46M             | 0.179368 | +0.019368 |
+| Chronos T5 Base 200M                    | 0.226899 | +0.066899 |
+
+  (The TSFM and naive figures are the existing project results quoted from
+  Part 2 section P. They were NOT recomputed, altered or overwritten by this
+  stage; `Results/Evaluation/model_comparison_rps.csv`, `rps_by_round.csv` and
+  every other pre-existing evaluation artifact are byte-identical.)
+
+Interpretation
+  All three completed feature-based baselines beat the naive equal-probability
+  benchmark on the held-out M6 sample, while every TSFM tested in Stages 1-5 did
+  not. That is evidence for explanation (b) of section A: the M6 ranking task is
+  not simply unpredictable at this horizon - a purpose-built feature-based
+  learner extracts a small but consistent edge from it - whereas zero-shot
+  time-series foundation models underperform even the uniform forecast.
+
+  The edge is genuine but SMALL: about 0.0029 RPS, roughly 1.8% relative to the
+  naive benchmark, spread across 9 of 12 rounds rather than concentrated in one.
+  Nothing here should be read as strong forecasting skill.
+
+  Tuning-to-held-out degradation is modest and consistent, which is what one
+  wants to see: RF/no_knn 0.155614 -> 0.157053 (+0.001439), RF/knn 0.155624 ->
+  0.157149 (+0.001525), LGBM/no_knn 0.155950 -> 0.157432 (+0.001481). The tuning
+  figures were the minimum over 41-117 feasible candidates and so were
+  optimistically biased; the held-out numbers are not, and they remain below
+  0.16.
+
+  The KNN and no-KNN branches are practically indistinguishable (RF: 0.157053 vs
+  0.157149, a gap of 0.0001). On this evidence the Samartzis-style KNN treatment
+  of missing returns does not materially affect final M6 performance, which is
+  the question the two-pipeline design was built to answer.
+
+--------------------------------------------------------------------------------
+E. CONFIGURATION FAILURE - LGBM / KNN
+--------------------------------------------------------------------------------
+
+  Status          STOPPED, no M6 RPS reported
+  Failed at       Round 11, origin 2022-12-09
+  Reason          adjusted probability below 0 (minimum -0.001070)
+  Rounds valid    1-10 produced valid probabilities before the failure
+
+  This is the risk identified and quantified before tuning (Part 2, section AS):
+  the released adjustment forces each quintile column to a cross-sectional mean
+  of 0.20 but does not bound individual entries, so a sharp cross-section can
+  push a tail entry past a bound. The diagnostic found this to be marginal for
+  Random Forest but substantial in parts of the LightGBM space, and the
+  infeasibility rule was adopted precisely so that tuning would not select such
+  a configuration. LGBM/knn passed all 12 TUNING origins, so it was selectable;
+  it then failed on one held-out round.
+
+  The violation is small in magnitude (-0.001070, one entry). It was NOT
+  clipped, renormalised, rounded away or excused, and no substitute
+  hyperparameter set was tried, because the instruction for this stage is
+  explicit: a configuration that cannot produce valid forecasts across the
+  held-out M6 period must not be given a misleading complete M6 RPS. Its
+  rounds 1-10 forecasts are also excluded from the predictions file, so no
+  partial result can be mistaken for a complete one.
+
+  What this means for the research question: three of the four configurations
+  completed, including one LightGBM variant, so the comparison in section D is
+  not compromised. The honest statement is that the released post-processing
+  rule is not robust for LightGBM on this data, not that LightGBM/KNN is a poor
+  forecaster - its rounds 1-10 were valid and it was competitive in tuning.
+  Whether to revisit the post-processing for LightGBM is a decision for a later
+  stage, not something this stage was permitted to resolve.
+
+--------------------------------------------------------------------------------
+F. VALIDATION PERFORMED
+--------------------------------------------------------------------------------
+
+  - Exactly 12 M6 origins evaluated, cross-checked between the baseline origin
+    schedule and the official round schedule (origins AND target ends).
+  - Hyperparameters byte-identical to the stored tuning winners, all four.
+  - No hyperparameter search of any kind ran: the evaluation script does not
+    import or invoke HyperOpt.
+  - Training causal at every round in both branches (no unrealised target, no
+    row dated at or after the origin) - checked independently of the script.
+  - Prediction features use information only through the origin: spot-checked by
+    recomputing `feat_ret_4w_recent` for AMZN at the round-5 origin 2022-06-24
+    from the raw return panel (window 2022-05-30..2022-06-24), matching the
+    stored value exactly.
+  - The official outcome is loaded only after all forecasting completes; the log
+    records "All forecasts produced; now loading the official M6 ground truth"
+    after the last forecast line.
+  - All 100 assets forecast in every round, and the asset SET matches the
+    official truth's asset set in every round for every configuration.
+  - Rank ordering correct: in the official truth for round 1 the worst realised
+    return (OGN) carries Rank1 = 1.0 and the best (PYPL) carries Rank5 = 1.0;
+    the models' probability column j is quintile j = Rank j+1 by construction.
+  - Probabilities finite, within [0, 1] and summing to 1: minima 0.010308
+    (RF/no_knn), 0.022264 (RF/knn), 0.043814 (LGBM/no_knn); maxima 0.4680-0.5306;
+    maximum row-sum error 1.3e-15.
+  - The official evaluator is used correctly: the ground truth rebuilt here is
+    identical to the stored `m6_ground_truth_quintiles.csv` (memberships and
+    realised returns), and a uniform 0.2 forecast pushed through this stage's
+    own scoring path returns exactly 0.160000 in every round - reproducing the
+    project's naive benchmark.
+  - Preprocessing and tuning outputs unchanged: SHA-256 taken before and after
+    the run for the tuning results, both supervised datasets, `Data/assets_m6.csv`,
+    `scripts/evaluate_m6_rps.py`, `scripts/tune_feature_baselines.py` and
+    `model_comparison_rps.csv` - all seven byte-identical.
+
+  Pre-evaluation leakage audit. Before this stage a full read-only causality
+  audit of the tuning stage was carried out and found NO leakage risk: training
+  eligibility, feature windows, future-target separation, KNN causality (features
+  bit-identical when all post-origin returns are corrupted), absence of any
+  target-proxy feature (max |Spearman| 0.051 against the target quintile) and
+  the exclusive use of the 12 pre-M6 origins in hyperparameter selection were all
+  confirmed directly from code and data.
+
+--------------------------------------------------------------------------------
+G. FILES AND RUNTIME
+--------------------------------------------------------------------------------
+
+Created
+  scripts/evaluate_feature_baselines_m6.py
+      The held-out evaluation. Loads the frozen configurations, forecasts all 12
+      rounds per configuration with causal expanding retraining, applies the
+      released adjustment, enforces the stop-on-invalid rule, then scores with
+      the project's existing official evaluator.
+  Results/Evaluation/feature_baseline_m6_predictions.csv
+      3,600 rows = 3 completed configurations x 12 rounds x 100 assets. Columns:
+      model, variant, round, origin_date, symbol, Rank1..Rank5. LGBM/knn is
+      absent because it was stopped.
+  Results/Evaluation/feature_baseline_m6_rps.csv
+      One row per configuration: model, variant, status, the 12 round RPS
+      values, mean_m6_rps, vs_naive, mean_tuning_rps, the frozen hyperparameters,
+      failure round/origin/reason where applicable, training-row range,
+      probability minima/maxima and row-sum error, package versions, seed and
+      timestamp.
+  logs/feature_baseline_m6_evaluation.log
+      The retained run log for this stage. From this stage onward, persistent
+      execution logs for modelling, tuning and evaluation belong under `logs/`.
+  documentation_part3.txt
+      This file.
+
+Modified
+  Nothing. No existing project file was changed or regenerated by this stage.
+
+Runtime
+  1 minute 57 seconds in total (RF/no_knn 1.22 min, RF/knn 0.51 min,
+  LGBM/no_knn 0.07 min, LGBM/knn 0.08 min before it stopped). No execution
+  problems: no crash, no warning of consequence, no retry.
+
+================================================================================
+END OF STAGE 8 - HELD-OUT M6 EVALUATION.
+================================================================================

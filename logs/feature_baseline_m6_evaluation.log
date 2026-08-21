@@ -1,0 +1,60 @@
+2026-08-21 18:37:59,438 INFO evaluate_feature_baselines_m6: Frozen configurations: lgbm/knn, lgbm/no_knn, rf/knn, rf/no_knn
+2026-08-21 18:37:59,438 INFO evaluate_feature_baselines_m6: M6 origins: 2022-03-04, 2022-04-01, 2022-04-29, 2022-05-27, 2022-06-24, 2022-07-22, 2022-08-19, 2022-09-16, 2022-10-14, 2022-11-11, 2022-12-09, 2023-01-06
+2026-08-21 18:37:59,438 INFO evaluate_feature_baselines_m6: Forecasting lgbm/knn with frozen params {"feature_fraction": 0.8269326697629207, "learning_rate": 0.03258958266232332, "max_depth": 5, "min_data_in_leaf": 45, "num_leaves": 432, "subsample": 0.8149561631049148}
+2026-08-21 18:37:59,950 INFO evaluate_feature_baselines_m6: lgbm/knn round  1 (2022-03-04): trained on 14163 rows, forecast 100 assets
+2026-08-21 18:38:00,399 INFO evaluate_feature_baselines_m6: lgbm/knn round  2 (2022-04-01): trained on 14263 rows, forecast 100 assets
+2026-08-21 18:38:00,854 INFO evaluate_feature_baselines_m6: lgbm/knn round  3 (2022-04-29): trained on 14363 rows, forecast 100 assets
+2026-08-21 18:38:01,305 INFO evaluate_feature_baselines_m6: lgbm/knn round  4 (2022-05-27): trained on 14463 rows, forecast 100 assets
+2026-08-21 18:38:01,727 INFO evaluate_feature_baselines_m6: lgbm/knn round  5 (2022-06-24): trained on 14563 rows, forecast 100 assets
+2026-08-21 18:38:02,175 INFO evaluate_feature_baselines_m6: lgbm/knn round  6 (2022-07-22): trained on 14663 rows, forecast 100 assets
+2026-08-21 18:38:02,604 INFO evaluate_feature_baselines_m6: lgbm/knn round  7 (2022-08-19): trained on 14763 rows, forecast 100 assets
+2026-08-21 18:38:03,062 INFO evaluate_feature_baselines_m6: lgbm/knn round  8 (2022-09-16): trained on 14863 rows, forecast 100 assets
+2026-08-21 18:38:03,587 INFO evaluate_feature_baselines_m6: lgbm/knn round  9 (2022-10-14): trained on 14963 rows, forecast 100 assets
+2026-08-21 18:38:04,005 INFO evaluate_feature_baselines_m6: lgbm/knn round 10 (2022-11-11): trained on 15063 rows, forecast 100 assets
+2026-08-21 18:38:04,419 ERROR evaluate_feature_baselines_m6: lgbm/knn: STOPPED at round 11 (2022-12-09) - probability below 0 (min -0.001070)
+2026-08-21 18:38:04,422 INFO evaluate_feature_baselines_m6: Forecasting lgbm/no_knn with frozen params {"feature_fraction": 0.6104930788531148, "learning_rate": 0.03785517965977751, "max_depth": 5, "min_data_in_leaf": 50, "num_leaves": 192, "subsample": 0.716389099741822}
+2026-08-21 18:38:04,870 INFO evaluate_feature_baselines_m6: lgbm/no_knn round  1 (2022-03-04): trained on 14163 rows, forecast 100 assets
+2026-08-21 18:38:05,224 INFO evaluate_feature_baselines_m6: lgbm/no_knn round  2 (2022-04-01): trained on 14263 rows, forecast 100 assets
+2026-08-21 18:38:05,579 INFO evaluate_feature_baselines_m6: lgbm/no_knn round  3 (2022-04-29): trained on 14363 rows, forecast 100 assets
+2026-08-21 18:38:05,938 INFO evaluate_feature_baselines_m6: lgbm/no_knn round  4 (2022-05-27): trained on 14463 rows, forecast 100 assets
+2026-08-21 18:38:06,315 INFO evaluate_feature_baselines_m6: lgbm/no_knn round  5 (2022-06-24): trained on 14563 rows, forecast 100 assets
+2026-08-21 18:38:06,672 INFO evaluate_feature_baselines_m6: lgbm/no_knn round  6 (2022-07-22): trained on 14663 rows, forecast 100 assets
+2026-08-21 18:38:07,024 INFO evaluate_feature_baselines_m6: lgbm/no_knn round  7 (2022-08-19): trained on 14763 rows, forecast 100 assets
+2026-08-21 18:38:07,377 INFO evaluate_feature_baselines_m6: lgbm/no_knn round  8 (2022-09-16): trained on 14863 rows, forecast 100 assets
+2026-08-21 18:38:07,695 INFO evaluate_feature_baselines_m6: lgbm/no_knn round  9 (2022-10-14): trained on 14963 rows, forecast 100 assets
+2026-08-21 18:38:08,015 INFO evaluate_feature_baselines_m6: lgbm/no_knn round 10 (2022-11-11): trained on 15063 rows, forecast 100 assets
+2026-08-21 18:38:08,341 INFO evaluate_feature_baselines_m6: lgbm/no_knn round 11 (2022-12-09): trained on 15163 rows, forecast 100 assets
+2026-08-21 18:38:08,684 INFO evaluate_feature_baselines_m6: lgbm/no_knn round 12 (2023-01-06): trained on 15263 rows, forecast 100 assets
+2026-08-21 18:38:08,687 INFO evaluate_feature_baselines_m6: Forecasting rf/knn with frozen params {"criterion": "gini", "max_depth": 8, "max_features": 0.5, "min_samples_leaf": 6, "min_samples_split": 10, "n_estimators": 450}
+2026-08-21 18:38:11,001 INFO evaluate_feature_baselines_m6: rf/knn round  1 (2022-03-04): trained on 14163 rows, forecast 100 assets
+2026-08-21 18:38:13,261 INFO evaluate_feature_baselines_m6: rf/knn round  2 (2022-04-01): trained on 14263 rows, forecast 100 assets
+2026-08-21 18:38:15,516 INFO evaluate_feature_baselines_m6: rf/knn round  3 (2022-04-29): trained on 14363 rows, forecast 100 assets
+2026-08-21 18:38:17,821 INFO evaluate_feature_baselines_m6: rf/knn round  4 (2022-05-27): trained on 14463 rows, forecast 100 assets
+2026-08-21 18:38:20,156 INFO evaluate_feature_baselines_m6: rf/knn round  5 (2022-06-24): trained on 14563 rows, forecast 100 assets
+2026-08-21 18:38:22,813 INFO evaluate_feature_baselines_m6: rf/knn round  6 (2022-07-22): trained on 14663 rows, forecast 100 assets
+2026-08-21 18:38:25,778 INFO evaluate_feature_baselines_m6: rf/knn round  7 (2022-08-19): trained on 14763 rows, forecast 100 assets
+2026-08-21 18:38:28,503 INFO evaluate_feature_baselines_m6: rf/knn round  8 (2022-09-16): trained on 14863 rows, forecast 100 assets
+2026-08-21 18:38:31,221 INFO evaluate_feature_baselines_m6: rf/knn round  9 (2022-10-14): trained on 14963 rows, forecast 100 assets
+2026-08-21 18:38:33,932 INFO evaluate_feature_baselines_m6: rf/knn round 10 (2022-11-11): trained on 15063 rows, forecast 100 assets
+2026-08-21 18:38:36,655 INFO evaluate_feature_baselines_m6: rf/knn round 11 (2022-12-09): trained on 15163 rows, forecast 100 assets
+2026-08-21 18:38:39,602 INFO evaluate_feature_baselines_m6: rf/knn round 12 (2023-01-06): trained on 15263 rows, forecast 100 assets
+2026-08-21 18:38:39,604 INFO evaluate_feature_baselines_m6: Forecasting rf/no_knn with frozen params {"criterion": "entropy", "max_depth": 7, "max_features": 0.5, "min_samples_leaf": 5, "min_samples_split": 8, "n_estimators": 450}
+2026-08-21 18:38:45,678 INFO evaluate_feature_baselines_m6: rf/no_knn round  1 (2022-03-04): trained on 14163 rows, forecast 100 assets
+2026-08-21 18:38:51,389 INFO evaluate_feature_baselines_m6: rf/no_knn round  2 (2022-04-01): trained on 14263 rows, forecast 100 assets
+2026-08-21 18:38:57,203 INFO evaluate_feature_baselines_m6: rf/no_knn round  3 (2022-04-29): trained on 14363 rows, forecast 100 assets
+2026-08-21 18:39:03,178 INFO evaluate_feature_baselines_m6: rf/no_knn round  4 (2022-05-27): trained on 14463 rows, forecast 100 assets
+2026-08-21 18:39:09,132 INFO evaluate_feature_baselines_m6: rf/no_knn round  5 (2022-06-24): trained on 14563 rows, forecast 100 assets
+2026-08-21 18:39:15,201 INFO evaluate_feature_baselines_m6: rf/no_knn round  6 (2022-07-22): trained on 14663 rows, forecast 100 assets
+2026-08-21 18:39:21,276 INFO evaluate_feature_baselines_m6: rf/no_knn round  7 (2022-08-19): trained on 14763 rows, forecast 100 assets
+2026-08-21 18:39:27,734 INFO evaluate_feature_baselines_m6: rf/no_knn round  8 (2022-09-16): trained on 14863 rows, forecast 100 assets
+2026-08-21 18:39:33,885 INFO evaluate_feature_baselines_m6: rf/no_knn round  9 (2022-10-14): trained on 14963 rows, forecast 100 assets
+2026-08-21 18:39:40,021 INFO evaluate_feature_baselines_m6: rf/no_knn round 10 (2022-11-11): trained on 15063 rows, forecast 100 assets
+2026-08-21 18:39:46,639 INFO evaluate_feature_baselines_m6: rf/no_knn round 11 (2022-12-09): trained on 15163 rows, forecast 100 assets
+2026-08-21 18:39:53,025 INFO evaluate_feature_baselines_m6: rf/no_knn round 12 (2023-01-06): trained on 15263 rows, forecast 100 assets
+2026-08-21 18:39:53,030 INFO evaluate_feature_baselines_m6: All forecasts produced; now loading the official M6 ground truth.
+2026-08-21 18:39:53,176 ERROR evaluate_feature_baselines_m6: lgbm/knn: no M6 RPS reported (configuration stopped).
+2026-08-21 18:39:53,205 INFO evaluate_feature_baselines_m6: lgbm/no_knn: mean M6 RPS 0.157432 (naive 0.160000, difference -0.002568)
+2026-08-21 18:39:53,231 INFO evaluate_feature_baselines_m6: rf/knn: mean M6 RPS 0.157149 (naive 0.160000, difference -0.002851)
+2026-08-21 18:39:53,253 INFO evaluate_feature_baselines_m6: rf/no_knn: mean M6 RPS 0.157053 (naive 0.160000, difference -0.002947)
+2026-08-21 18:39:53,282 INFO evaluate_feature_baselines_m6: Wrote C:\Users\13327\OneDrive\Desktop\Research 2nd try\Research-task\Results\Evaluation\feature_baseline_m6_predictions.csv
+2026-08-21 18:39:53,285 INFO evaluate_feature_baselines_m6: Wrote C:\Users\13327\OneDrive\Desktop\Research 2nd try\Research-task\Results\Evaluation\feature_baseline_m6_rps.csv
