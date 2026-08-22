@@ -1,0 +1,496 @@
+================================================================================
+M6 RESEARCH PROJECT - DOCUMENTATION, PART 4
+Competition-grade M6 benchmark: reproduction of J.M.G. Vilar's quasi-average
+forecasting method.
+
+documentation.txt (Stages 1-5, TSFM pipeline), documentation_part2.txt
+(Stages 6-7, Dataset D preprocessing, feature engineering, pre-M6 tuning) and
+documentation_part3.txt (Stages 8-10, held-out M6 evaluation, Softmax,
+exploratory metrics) are all CLOSED and are not modified by this stage.
+Part 4 covers the competition benchmark only.
+================================================================================
+
+--------------------------------------------------------------------------------
+A. WHY VILAR RATHER THAN STANEK - THE MODEL-SELECTION REASONING
+--------------------------------------------------------------------------------
+
+This section records the full reasoning, because the research proposal named a
+different benchmark and the change needs to be defensible to a supervisor.
+
+The objective, unchanged
+  The proposal committed to reproducing a STRONG COMPETITION-GRADE M6
+  forecasting approach, as an external reference point against which this
+  project's own models could be judged. That objective is unchanged. What
+  changed is which competition entry serves as that reference.
+
+What the project's own results revealed
+  By the time this benchmark was implemented, the project had completed four
+  learned feature-based classifiers and four TSFM specifications. The
+  feature-based results clustered very tightly:
+
+      RF / no-KNN        0.157053
+      RF / KNN           0.157149
+      Softmax / KNN      0.157355
+      LightGBM / no-KNN  0.157432
+
+  All four land within 0.0004 RPS of one another, and all four beat the naive
+  0.160000 benchmark by roughly 0.003. This is an empirical finding with a
+  direct bearing on benchmark choice: relatively standard models - including a
+  plain multinomial logistic regression - already reach the narrow performance
+  band occupied by highly ranked M6 entries. The verified M6 reference points
+  make the point sharply. From the Vilar paper's Table 1:
+
+      best forecasting-track performer (global RPS)   0.15645   (rank 1)
+      Vilar's approach                                0.15729   (rank 8)
+      naive benchmark                                 0.16000   (rank 51)
+
+  So the ENTIRE spread between 1st place and 8th place in the M6 forecasting
+  track is 0.00084 RPS, and the spread between 1st place and the naive forecast
+  is 0.00355. The competition was decided inside a band narrower than the gap
+  between this project's own best and worst feature-based model and the naive
+  benchmark.
+
+Why Vilar is the right benchmark for THIS project
+  1. STRONG REAL COMPETITION PERFORMANCE. 8th of 163 in the forecasting track,
+     and 5th on the combined global rank. This is a genuinely top-tier entry,
+     not a convenience choice.
+  2. SIMPLICITY, WHICH IS THE POINT. Vilar's method uses no learning at all: it
+     estimates each asset's quintile distribution as a weighted average of
+     historical frequencies. It therefore provides a CONCEPTUAL CONTRAST that
+     neither the learned classifiers nor the TSFMs supply - a purely
+     distributional, assumption-light method that nevertheless finished 8th.
+  3. COMPLEMENTARITY. RF (bagged trees), LightGBM (boosted trees) and Softmax
+     (linear) already cover three learned model families, and the TSFMs cover
+     the zero-shot deep-learning end. Adding another learned model would add a
+     fourth variation on ground already covered. Vilar adds a fundamentally
+     different, competition-proven approach.
+  4. REPRODUCIBILITY. Vilar supplies a complete, directly auditable
+     reproducibility package - the paper, an executable notebook, the universe
+     file and the full adjusted-close history. Every parameter used here was
+     read out of that package and cross-checked against the notebook's own
+     executable code (Section F). Reproduction fidelity can be demonstrated
+     rather than asserted.
+  5. PROPORTIONALITY TO THE RESEARCH QUESTION. This project's central questions
+     concern TIME-SERIES FOUNDATION MODELS - whether zero-shot TSFMs are
+     competitive on cross-sectional financial ranking. The benchmark's job is to
+     locate the achievable performance band, not to be an object of study in its
+     own right.
+
+  Staněk's approach is substantially more complex, using a meta-learning /
+  hypernetwork architecture. Reproducing that faithfully would be a significant
+  modelling project on its own.
+
+  ON THE NUMERICAL COMPARISON - AN HONEST LIMITATION.
+  The intention was to record the exact published RPS of the Staněk entry and
+  the resulting gap. THAT NUMBER COULD NOT BE VERIFIED from the materials
+  available in this session: the Vilar paper does not name the other entrants,
+  nothing in this repository references Staněk, and no external source could be
+  consulted. Rather than record an unverified figure, the argument is stated in
+  a form that only uses VERIFIED numbers:
+
+      whatever the Staněk entry scored, it cannot be better than the
+      best forecasting-track RPS of 0.15645 (Vilar, Table 1). The maximum
+      possible gap between Vilar's 0.15729 and ANY other M6 forecasting entry
+      is therefore 0.00084 RPS.
+
+  That bound is sufficient for the argument and does not depend on the
+  unverified value. It should be replaced with the exact Staněk figure once
+  confirmed. [ACTION: confirm Staněk's published forecasting RPS and insert.]
+
+  The framing is NOT "Staněk was too difficult". The reasoning is: strong real
+  competition performance, simplicity that creates a genuine conceptual
+  contrast, complementarity with the model families already covered,
+  auditable reproducibility, and proportionality to a research question that is
+  about TSFMs rather than about the benchmark.
+
+SUPERVISOR-READY SUMMARY (short form)
+  "The proposal named Staněk as the competition benchmark. Once our own
+  Random Forest, LightGBM and Softmax models all landed around RPS 0.157, it
+  became clear that the entire M6 forecasting track was decided within a band of
+  about 0.0008 RPS between first and eighth place, and about 0.0036 between
+  first place and the naive forecast. In that context the value of a competition
+  benchmark is to locate the achievable band, not to add architectural
+  complexity. We therefore reproduced Vilar's entry, which placed 8th of 163
+  with RPS 0.15729. Vilar is attractive on four counts: it is a genuinely
+  top-ranked entry; it is conceptually the opposite of everything else in our
+  study, using historical frequency averaging rather than learning, which makes
+  it a real contrast to both our learned classifiers and the foundation models;
+  our learned models already cover bagging, boosting and a linear baseline, so
+  another learned architecture would have added little; and it ships a complete
+  reproducibility package, so we can demonstrate fidelity rather than claim it.
+  Staněk's meta-learning/hypernetwork approach is considerably more complex, and
+  reproducing it would have added substantial modelling work for a reference
+  point that, given the width of the band, would sit within about 0.0008 RPS of
+  the one we already have. Our reproduction scored 0.157048, within 0.00024 of
+  Vilar's published figure."
+
+--------------------------------------------------------------------------------
+B. SOURCE MATERIALS
+--------------------------------------------------------------------------------
+
+  All inside `Competition Benchmark Reference/`, treated as READ-ONLY. Verified
+  by SHA-256 before and after this stage: all four files unchanged.
+
+    Quasi Paper.pdf   Jose M.G. Vilar, "Quasi-average predictions and regression
+                      to the trend: An application to the M6 financial
+                      forecasting competition", International Journal of
+                      Forecasting 41 (2025) 1505-1513.
+    m6paper.ipynb     the released reproducibility notebook (17 cells). Cells
+                      4, 5, 7 and 9 contain the forecasting method; cells 6, 11,
+                      13-15 are figures; cell 12 is the separate investment /
+                      information-ratio track, which is NOT part of this
+                      reproduction.
+    M6_Universe.csv   100 assets, 50 Stock / 50 ETF, with classes.
+    AdjClose.csv.gz   adjusted closes, 6,205 trading days 2000-01-03 ..
+                      2023-10-13, 100 assets, columns in universe order.
+
+  Symbol note: Vilar's universe uses EG (Everest Group); this project's
+  canonical M6 ticker for the same security is RE. The mapping EG -> RE is
+  applied on output only, and was validated in project Stage 1B. It is the only
+  naming difference between the two universes.
+
+--------------------------------------------------------------------------------
+C. THE REPRODUCED METHOD
+--------------------------------------------------------------------------------
+
+The quintile panel (notebook cell 4)
+      lag = 20
+      qf  = 1 + log(P).diff(20)[trim:].apply(qcut(., 5, labels=False), axis=1)
+  - `log(P_t) - log(P_{t-20})` is the ROLLING 20-trading-day log return. It is
+    computed on EVERY trading day, so consecutive rows overlap by 19 days. This
+    matters: the "5 periods" window below is 5*20 = 100 daily overlapping
+    observations, not 5 independent four-week observations.
+  - `axis=1` makes `qcut` CROSS-SECTIONAL: on each date the 100 assets are cut
+    into five equal groups. `labels=False` gives 0..4 ascending in return, and
+    the leading `1 +` shifts to 1..5. So QUINTILE 1 = WORST 20-day return and
+    QUINTILE 5 = BEST, which matches this project's Rank1..Rank5 convention.
+  - `duplicates='drop'` guards against tied bin edges.
+  - The leading trim `[-lag*((len(P)-1)//lag - 1) - 1:]` keeps the last 6,181
+    rows (drops the first 24). It is reproduced exactly because it defines where
+    the "400-period" window starts.
+
+q_dists (notebook cell 7) - unchanged
+      xi = x.dropna().astype(int)
+      if len(xi) == 0: return [0.2, 0.4, 0.6, 0.8, 1.0]
+      r = counts of quintiles 1..5;  return r.cumsum() / r.sum()
+  Returns a CUMULATIVE distribution. Two behaviours are preserved deliberately:
+  the `dropna()` is per asset and per window, so a missing observation for one
+  asset never removes that date for the other 99; and the uniform fallback fires
+  only when a particular asset/window has no usable observation at all.
+
+The three components (notebook cell 9), for an information window ending at the
+origin (exclusive stop `end`, last usable row `end-1`):
+
+  TYPE, over the trailing 50 periods = 50*20 = 1,000 daily rows
+      group vector = mean over the group's assets of q_dists(asset column)
+      Groups: ETFs (49), Stocks (49), VXX (1), DRE (1).
+
+  TEMPORAL, per asset, three windows ending at the same point
+      0.2 * q_dists over the last   5*20 =   100 rows
+    + 0.2 * q_dists over the last  10*20 =   200 rows
+    + 0.6 * q_dists over the last 400*20 = 8,000 rows
+  The 400-period window (8,000 rows) exceeds the 6,181-row panel, so in practice
+  it is ALL available history back to 2000-02-04. That is the released
+  behaviour and is preserved.
+
+  MIXED - the reported method (notebook's av = 0.5)
+      cumulative = 0.5 * type + 0.5 * temporal
+  Ordinary probabilities follow by first-differencing the cumulative vector
+  (the notebook's `desum`). The notebook's loop runs av = 1 (temporal only),
+  av = 0 (type only) and av = 0.5 (mixed); only the mixed variant is reproduced,
+  as that is the reported approach.
+
+VXX - exact handling
+  The paper identifies VXX as the "salient exception" among ETFs (its volatility
+  profile makes extreme quintiles far more likely). The notebook removes it from
+  `etfs` and gives it a one-member group. Consequence: VXX's type component is
+  its OWN 50-period distribution, not the ETF average. Reproduced exactly. At
+  the round-1 origin its type vector is [0.647, 0.692, 0.722, 0.760, 1.0]
+  against the ETF average [0.150, 0.400, 0.661, 0.883, 1.0] - i.e. VXX carries
+  about 65% probability on the worst quintile where the average ETF carries 15%.
+
+DRE - exact handling
+  DRE (Duke Realty) was acquired mid-competition. The notebook removes it from
+  `stocks`, computes a DRE group vector, AND THEN DISCARDS IT: the relevant
+  expression is `1*np.array([0.2,0.4,0.6,0.8,1]) + 0*res[3]`, so DRE's TYPE
+  component is the UNIFORM cumulative distribution. Its TEMPORAL component is
+  untouched, so DRE's mixed forecast is 0.5*uniform + 0.5*(its own temporal
+  distribution). This is a notebook-only special case - the paper does not
+  discuss it - and it is reproduced exactly rather than "improved". A unit test
+  asserts that the computed DRE group vector exists and is NOT what is used.
+
+Missing values, overall
+  No date is ever dropped for all assets. Missingness is absorbed entirely by
+  the per-asset `dropna()` inside q_dists, with the uniform fallback as the
+  last resort. Example from the round-1 origin: the 400-period window has 5,761
+  rows, of which ABBV has 2,373 non-NaN (it listed in 2012), VXX 1,052, and DRE
+  5,761. Each asset simply averages over what it has.
+
+--------------------------------------------------------------------------------
+D. PAPER-VERSUS-NOTEBOOK DIFFERENCES
+--------------------------------------------------------------------------------
+
+  Both were audited. Three differences of note; in all three the RELEASED
+  EXECUTABLE BEHAVIOUR was preserved, as instructed.
+
+  1. PERIOD GRANULARITY. The paper writes the averages as sums over periods T
+     (equation text: "the average over the last 5 periods, from T5P to TF"),
+     which reads as 5 four-week observations. The notebook averages over
+     5*lag = 100 DAILY rows of overlapping 20-day returns. The window spans the
+     same calendar length, but contains 100 overlapping observations rather than
+     5 independent ones. The notebook behaviour is used.
+  2. DRE. The paper does not mention DRE at all. The notebook's uniform-type
+     special case is therefore a code-only decision, preserved as described.
+  3. LIVE PARAMETERS. The paper states the approach was used "with slightly
+     different parameters in each submission". Those parameters are not
+     published. This reproduction uses only the FIXED notebook specification.
+     No attempt was made to guess the live parameters.
+
+  Not a discrepancy but worth recording: the notebook's j-loop begins at
+  j = -lag, which produces an out-of-range target slice; the notebook's own
+  plotting code discards that first entry (`lastd[1:78]`). This reproduction
+  addresses specific origins directly and never encounters it.
+
+--------------------------------------------------------------------------------
+E. CAUSAL ALIGNMENT TO THE PROJECT'S M6 ORIGINS
+--------------------------------------------------------------------------------
+
+  The project's 12 official origins are used unchanged, and so are the project's
+  official ground truth and RPS scorer. No new schedule or metric was defined.
+
+  The alignment turned out to be exact, which was verified rather than assumed:
+    - all 12 origin dates and all 12 forecast-end dates are trading days in
+      Vilar's AdjClose history;
+    - every round spans EXACTLY 20 trading days from origin to forecast end,
+      so Vilar's lag = 20 target coincides with the M6 four-week period;
+    - consequently the "Vilar target date" (the panel row 20 positions after the
+      origin) equals the official forecast_end_date in all 12 rounds. The script
+      records this per round and asserts it.
+
+  For each origin T the information window is `panel[:position(T)+1]`, so the
+  last row used is T itself. The quintile at T is the return over (T-20, T], so
+  nothing dated after T is read even indirectly.
+
+  Leakage checks performed (all pass):
+    (1) Destroying EVERY price strictly after the origin leaves the forecast
+        bit-identical. Verified at all 12 origins.
+    (2) Negative control: perturbing a SINGLE asset before the origin does
+        change the forecast (max change 0.0163 at round 1). This control matters
+        - an earlier version scaled all assets uniformly, which cannot change a
+        cross-sectional rank and so gave a vacuous pass.
+    (3) The widest window's last date equals the origin; zero rows after the
+        origin appear in any window.
+    (4) Official scoring happens only after all 12 rounds are forecast.
+
+--------------------------------------------------------------------------------
+F. NOTEBOOK-TO-SCRIPT NUMERICAL VALIDATION
+--------------------------------------------------------------------------------
+
+  The clean script was checked against the notebook's OWN cell-9 expression,
+  executed inline on the same inputs, for all 12 M6 origins (notebook loop
+  indices j = 400, 380, ..., 180).
+
+      quintile panel identical to the notebook's `qf`      : True
+      max |cumulative difference| over all 12 rounds       : 2.220e-16
+      max |probability difference| over all 12 rounds      : 2.220e-16
+      notebook's own origin date == project origin, all 12 : True
+
+  That is floating-point equality: the clean implementation reproduces the
+  released notebook logic exactly.
+
+  Traceable worked example - origin 2022-03-04, asset ABBV:
+      P[2022-02-04] = 125.2807, P[2022-03-04] = 127.9548
+      20-day log return = +0.021120  ->  cross-sectional quintile 5
+      q_dists   5P (100 rows, 100 usable) = [0.000, 0.020, 0.070, 0.280, 1.000]
+      q_dists  10P (200 rows, 200 usable) = [0.160, 0.245, 0.345, 0.585, 1.000]
+      q_dists 400P (5,761 rows, 2,373 usable) = [0.250, 0.399, 0.510, 0.685, 1.000]
+      temporal (0.2/0.2/0.6)              = [0.182, 0.292, 0.389, 0.584, 1.000]
+      type (Stocks group, 50 periods)     = [0.249, 0.396, 0.534, 0.708, 1.000]
+      mixed (0.5/0.5)                     = [0.216, 0.344, 0.462, 0.646, 1.000]
+      ordinary Rank1..Rank5               = [0.2157, 0.1285, 0.1174, 0.1841, 0.3543]
+      sum = 1.0000000000
+
+  Same origin, VXX (own class):
+      20-day log return +0.179057 -> quintile 5
+      type = [0.647, 0.692, 0.722, 0.760, 1.000]  (its own history, not the ETF mean)
+      mixed probabilities = [0.6156, 0.0444, 0.0373, 0.0396, 0.2631]
+
+  Same origin, DRE (uniform type):
+      20-day log return -0.110952 -> quintile 3
+      type = [0.2, 0.4, 0.6, 0.8, 1.0]  (uniform, by the notebook rule)
+      temporal = [0.234, 0.371, 0.490, 0.640, 1.000]
+      mixed probabilities = [0.2172, 0.1683, 0.1596, 0.1748, 0.2800]
+
+--------------------------------------------------------------------------------
+G. RESULTS
+--------------------------------------------------------------------------------
+
+Per-round official M6 RPS (project ground truth, project scorer)
+
+    Round  Origin        RPS        vs naive
+      1    2022-03-04    0.154702   beats
+      2    2022-04-01    0.159984   beats
+      3    2022-04-29    0.154666   beats
+      4    2022-05-27    0.156811   beats
+      5    2022-06-24    0.155921   beats
+      6    2022-07-22    0.150361   beats
+      7    2022-08-19    0.160346   above
+      8    2022-09-16    0.157633   beats
+      9    2022-10-14    0.159930   beats
+     10    2022-11-11    0.157907   beats
+     11    2022-12-09    0.155080   beats
+     12    2023-01-06    0.161237   above
+    ----------------------------------------
+     MEAN                0.157048
+
+    difference vs naive 0.160000        -0.002952
+    rounds beating naive                10 / 12
+    probability range                   [0.028564, 0.637141]
+    max row-sum error                   1.11e-16
+
+Two independent RPS figures, both reported
+    0.157048  official project scorer, project ground truth (headline)
+    0.157011  Vilar's OWN target definition on his own data - i.e. what the
+              released method scores on its own terms over the same 12 periods
+  The two agree to 0.00004, which is a useful cross-check that the project's
+  ground truth and Vilar's realised quintiles describe the same outcomes.
+
+Comparison with the published result
+    published Vilar global RPS   0.15729  (rank 8 of 163)
+    this reproduction            0.157048
+    difference                   -0.00024
+  The reproduction is 0.00024 BETTER than the published figure. It was not
+  tuned toward it, and no attempt was made to force a match. The most likely
+  explanations are the ones the paper itself implies: the live submissions used
+  "slightly different parameters in each submission", whereas this uses the
+  single fixed released specification; and the official competition scoring used
+  the organisers' own realised returns, which need not agree to the fifth decimal
+  with this project's ground truth built from Data/assets_m6.csv. A difference of
+  this size should be read as "the reproduction lands on the published result",
+  not as an improvement on it.
+
+Comparison with the project's models (all on the same 12 official rounds)
+
+    Vilar mixed (competition benchmark)   0.157048   -0.002952
+    RF / no-KNN                           0.157053   -0.002947
+    RF / KNN                              0.157149   -0.002851
+    Softmax / KNN                         0.157355   -0.002645
+    LightGBM / no-KNN                     0.157432   -0.002568
+    Naive (0.2 each)                      0.160000    0.000000
+    Chronos-2 120M (copula)               0.165418   +0.005418
+    Chronos-2 120M (independent)          0.165559   +0.005559
+    Financial Chronos 46M                 0.179368   +0.019368
+    Chronos-T5 Base 200M                  0.226899   +0.066899
+
+    (LightGBM/KNN is absent: it was stopped at round 11 by an invalid adjusted
+     probability and has no 12-round result. TSFM figures are the existing
+     project results, unchanged.)
+
+--------------------------------------------------------------------------------
+H. CONSERVATIVE INTERPRETATION
+--------------------------------------------------------------------------------
+
+  1. THE REPRODUCTION SUCCEEDED. 0.157048 against a published 0.15729, from an
+     implementation shown to be numerically identical to the released notebook.
+     The benchmark is trustworthy as a reference point.
+
+  2. VILAR AND RANDOM FOREST ARE INDISTINGUISHABLE. 0.157048 versus 0.157053 -
+     a gap of 0.000005, which is noise on 1,200 observations. A method that uses
+     no learning whatsoever, only weighted historical quintile frequencies,
+     matches a tuned Random Forest over ten engineered predictors. THIS SHOULD
+     NOT BE READ AS "the Random Forest is worthless"; it should be read as
+     evidence about the TASK: at this horizon and universe, most of the
+     attainable signal appears to be captured by knowing the historical
+     distribution of an asset's relative performance and its asset class.
+
+  3. THE ACHIEVABLE BAND IS NARROW AND NOW WELL-LOCATED. Five structurally very
+     different methods - historical frequency averaging, bagged trees, boosted
+     trees, linear softmax - all land between 0.15705 and 0.15743, while the
+     naive forecast sits at 0.16000 and the published competition winner at
+     0.15645. The project's models are inside the competitive band, not near it.
+
+  4. THE TSFM CONCLUSION IS STRENGTHENED. Every TSFM tested remains above the
+     naive benchmark while a competition-grade method, three learned
+     classifiers, and now a no-learning historical-average method all fall
+     below it. The earlier reading - that the shortfall is about the TSFMs
+     rather than about the task being unpredictable - now rests on a genuine
+     competition-proven reference rather than on this project's own models
+     alone.
+
+  5. DO NOT OVERINTERPRET THE ORDERING. Vilar "beating" RF by 0.000005, or the
+     spread of 0.0004 across the five sub-naive methods, carries no meaning on
+     12 rounds of 100 assets. The defensible statement is that they are
+     equivalent at this sample size.
+
+--------------------------------------------------------------------------------
+I. REPRODUCTION LIMITATIONS
+--------------------------------------------------------------------------------
+
+  1. FIXED PARAMETERS ONLY. The live M6 submissions used slightly different
+     parameters per submission, which are not published. This reproduces the
+     fixed released specification, and does not claim to reconstruct the actual
+     submitted forecasts.
+  2. FORECASTING TRACK ONLY. The investment/information-ratio track (notebook
+     cell 12) is not reproduced; it is outside this project's scope.
+  3. DIFFERENT PRICE SOURCE FOR SCORING. Forecasts are built from Vilar's
+     AdjClose.csv.gz; scoring uses this project's ground truth from
+     Data/assets_m6.csv. This is deliberate - every model in the project must be
+     scored identically - but it means the reproduction's score is not computed
+     against exactly the same realised returns the organisers used.
+  4. PERIOD GRANULARITY. As in Section D.1, the released code averages over
+     daily overlapping windows; a reading of the paper's notation as
+     non-overlapping periods would give slightly different numbers.
+  5. UNVERIFIED STANEK FIGURE. Section A records that the exact Staněk RPS could
+     not be verified here and states the argument using a verified bound
+     instead.
+
+--------------------------------------------------------------------------------
+J. FILES AND VALIDATION
+--------------------------------------------------------------------------------
+
+Created
+  Competition Benchmark/evaluate_vilar_competition_baseline.py
+      The whole stage: reference loading, quintile panel, q_dists, type /
+      temporal / mixed distributions, per-round causality assertions, the
+      internal Vilar-target reference RPS, and official scoring through the
+      project's existing evaluator.
+  Results/Evaluation/vilar_m6_predictions.csv
+      1,200 rows = 12 rounds x 100 assets. Columns: model, round, origin_date,
+      symbol, Rank1..Rank5.
+  Results/Evaluation/vilar_m6_rps.csv
+      One row: the 12 round RPS values, mean, naive difference, rounds beating
+      naive, internal reference RPS, published comparison, the fixed parameters,
+      probability range and row-sum error.
+  logs/vilar_competition_baseline.log
+  tests/test_vilar_competition_baseline.py
+      12 tests: q_dists semantics including the uniform fallback and per-asset
+      dropna; quintile direction (worst=1, best=5); VXX and DRE grouping; the
+      DRE uniform-type rule specifically; exact agreement with the notebook's
+      own cell-9 expression; the fixed parameter values; post-origin corruption
+      leaving forecasts unchanged with a working negative control; window
+      boundaries; and validity/completeness of the saved artifacts.
+  documentation_part4.txt
+      This file.
+
+Modified
+  Nothing. No existing project file was changed.
+
+Validation
+  - `Competition Benchmark Reference/` unchanged: SHA-256 of all four files
+    identical before and after.
+  - No completed experiment altered; the Vilar outputs are new files and the
+    RF / LightGBM / Softmax / TSFM artifacts were not touched.
+  - Notebook fidelity: max difference 2.220e-16 on all 12 rounds.
+  - Causality: post-origin corruption test passes at all 12 origins, with a
+    working negative control.
+  - Output validity: 1,200 forecasts, 100 assets per round, asset set equal to
+    the official truth in every round, all probabilities finite and in
+    [0.028564, 0.637141], rows summing to 1 within 1.11e-16.
+  - Full project test suite: 110 tests pass.
+
+Runtime
+  61 seconds end to end (about 27 s of that is building the quintile panel).
+
+================================================================================
+END OF STAGE 11 - COMPETITION BENCHMARK (VILAR).
+================================================================================

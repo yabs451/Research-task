@@ -1,0 +1,19 @@
+2026-08-22 12:59:10,637 INFO vilar_competition_baseline: Reference inputs: 6205 dates x 100 assets, 2000-01-03 .. 2023-10-13 | groups ETF=49 Stock=49 VXX=1 DRE=1
+2026-08-22 12:59:37,856 INFO vilar_competition_baseline: Quintile panel: 6181 dates (trim -6181) x 100 assets, 2000-02-04 .. 2023-10-13
+2026-08-22 12:59:38,865 INFO vilar_competition_baseline: Round  1 2022-03-04: 5761 information rows, last used 2022-03-04, Vilar target 2022-04-01 (official end 2022-04-01, agree=True)
+2026-08-22 12:59:39,820 INFO vilar_competition_baseline: Round  2 2022-04-01: 5781 information rows, last used 2022-04-01, Vilar target 2022-04-29 (official end 2022-04-29, agree=True)
+2026-08-22 12:59:40,796 INFO vilar_competition_baseline: Round  3 2022-04-29: 5801 information rows, last used 2022-04-29, Vilar target 2022-05-27 (official end 2022-05-27, agree=True)
+2026-08-22 12:59:41,830 INFO vilar_competition_baseline: Round  4 2022-05-27: 5821 information rows, last used 2022-05-27, Vilar target 2022-06-24 (official end 2022-06-24, agree=True)
+2026-08-22 12:59:42,854 INFO vilar_competition_baseline: Round  5 2022-06-24: 5841 information rows, last used 2022-06-24, Vilar target 2022-07-22 (official end 2022-07-22, agree=True)
+2026-08-22 12:59:43,884 INFO vilar_competition_baseline: Round  6 2022-07-22: 5861 information rows, last used 2022-07-22, Vilar target 2022-08-19 (official end 2022-08-19, agree=True)
+2026-08-22 12:59:44,887 INFO vilar_competition_baseline: Round  7 2022-08-19: 5881 information rows, last used 2022-08-19, Vilar target 2022-09-16 (official end 2022-09-16, agree=True)
+2026-08-22 12:59:45,938 INFO vilar_competition_baseline: Round  8 2022-09-16: 5901 information rows, last used 2022-09-16, Vilar target 2022-10-14 (official end 2022-10-14, agree=True)
+2026-08-22 12:59:46,935 INFO vilar_competition_baseline: Round  9 2022-10-14: 5921 information rows, last used 2022-10-14, Vilar target 2022-11-11 (official end 2022-11-11, agree=True)
+2026-08-22 12:59:48,012 INFO vilar_competition_baseline: Round 10 2022-11-11: 5941 information rows, last used 2022-11-11, Vilar target 2022-12-09 (official end 2022-12-09, agree=True)
+2026-08-22 12:59:49,034 INFO vilar_competition_baseline: Round 11 2022-12-09: 5961 information rows, last used 2022-12-09, Vilar target 2023-01-06 (official end 2023-01-06, agree=True)
+2026-08-22 12:59:50,078 INFO vilar_competition_baseline: Round 12 2023-01-06: 5981 information rows, last used 2023-01-06, Vilar target 2023-02-03 (official end 2023-02-03, agree=True)
+2026-08-22 13:00:05,593 INFO vilar_competition_baseline: Internal fixed-method RPS on Vilar's own targets: 0.157011
+2026-08-22 13:00:05,593 INFO vilar_competition_baseline: Forecasts complete; loading the project's official M6 ground truth.
+2026-08-22 13:00:06,442 INFO vilar_competition_baseline: Official project RPS: 0.157048 (naive 0.1600, difference -0.002952); 10/12 rounds beat naive
+2026-08-22 13:00:06,516 INFO vilar_competition_baseline: Wrote C:\Users\13327\OneDrive\Desktop\Research 2nd try\Research-task\Results\Evaluation\vilar_m6_predictions.csv (1200 rows)
+2026-08-22 13:00:06,529 INFO vilar_competition_baseline: Wrote C:\Users\13327\OneDrive\Desktop\Research 2nd try\Research-task\Results\Evaluation\vilar_m6_rps.csv
