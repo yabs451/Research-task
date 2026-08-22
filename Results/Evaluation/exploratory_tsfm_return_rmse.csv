@@ -1,0 +1,221 @@
+model,point_forecast,rmse_type,horizon,rmse,n_observations
+Chronos-T5 Base 200M,mean,daily,1,0.017894792704415616,1200
+Chronos-T5 Base 200M,mean,daily,2,0.015971480851203153,1200
+Chronos-T5 Base 200M,mean,daily,3,0.020565254449430217,1200
+Chronos-T5 Base 200M,mean,daily,4,0.019065765791439083,1200
+Chronos-T5 Base 200M,mean,daily,5,0.018153445527356534,1200
+Chronos-T5 Base 200M,mean,daily,6,0.017201848265793237,1200
+Chronos-T5 Base 200M,mean,daily,7,0.01573400108712748,1200
+Chronos-T5 Base 200M,mean,daily,8,0.0199857913568007,1200
+Chronos-T5 Base 200M,mean,daily,9,0.019098641697673818,1200
+Chronos-T5 Base 200M,mean,daily,10,0.01719962411072442,1200
+Chronos-T5 Base 200M,mean,daily,11,0.018877841506783878,1200
+Chronos-T5 Base 200M,mean,daily,12,0.01688158782651733,1200
+Chronos-T5 Base 200M,mean,daily,13,0.020723443140334825,1200
+Chronos-T5 Base 200M,mean,daily,14,0.018466260110667904,1200
+Chronos-T5 Base 200M,mean,daily,15,0.02046466418716858,1200
+Chronos-T5 Base 200M,mean,daily,16,0.01377470647925168,1200
+Chronos-T5 Base 200M,mean,daily,17,0.02134109138981088,1200
+Chronos-T5 Base 200M,mean,daily,18,0.015621657107368148,1200
+Chronos-T5 Base 200M,mean,daily,19,0.025913680572345152,1200
+Chronos-T5 Base 200M,mean,daily,20,0.022003818285044843,1200
+Chronos-T5 Base 200M,median,daily,1,0.01791486678260597,1200
+Chronos-T5 Base 200M,median,daily,2,0.01596874924123918,1200
+Chronos-T5 Base 200M,median,daily,3,0.0205796251826788,1200
+Chronos-T5 Base 200M,median,daily,4,0.01905882225834267,1200
+Chronos-T5 Base 200M,median,daily,5,0.01815573207755942,1200
+Chronos-T5 Base 200M,median,daily,6,0.017187715813513835,1200
+Chronos-T5 Base 200M,median,daily,7,0.0157270475260057,1200
+Chronos-T5 Base 200M,median,daily,8,0.019989539561644728,1200
+Chronos-T5 Base 200M,median,daily,9,0.019089778543402318,1200
+Chronos-T5 Base 200M,median,daily,10,0.017193178117900502,1200
+Chronos-T5 Base 200M,median,daily,11,0.01887698388394824,1200
+Chronos-T5 Base 200M,median,daily,12,0.016888937042346952,1200
+Chronos-T5 Base 200M,median,daily,13,0.020730295852972168,1200
+Chronos-T5 Base 200M,median,daily,14,0.018472696106410724,1200
+Chronos-T5 Base 200M,median,daily,15,0.020459394500638963,1200
+Chronos-T5 Base 200M,median,daily,16,0.013772409020270627,1200
+Chronos-T5 Base 200M,median,daily,17,0.021336780200933388,1200
+Chronos-T5 Base 200M,median,daily,18,0.015614345107382799,1200
+Chronos-T5 Base 200M,median,daily,19,0.02590803107771432,1200
+Chronos-T5 Base 200M,median,daily,20,0.022007368215856346,1200
+Chronos-T5 Base 200M,mean,cumulative,1,0.017809170376423,1200
+Chronos-T5 Base 200M,mean,cumulative,2,0.024157104926001968,1200
+Chronos-T5 Base 200M,mean,cumulative,3,0.027780199397104535,1200
+Chronos-T5 Base 200M,mean,cumulative,4,0.031120684419332127,1200
+Chronos-T5 Base 200M,mean,cumulative,5,0.03949337786906041,1200
+Chronos-T5 Base 200M,mean,cumulative,6,0.04538217193525431,1200
+Chronos-T5 Base 200M,mean,cumulative,7,0.04876520566065464,1200
+Chronos-T5 Base 200M,mean,cumulative,8,0.049149494622667864,1200
+Chronos-T5 Base 200M,mean,cumulative,9,0.05314413599985634,1200
+Chronos-T5 Base 200M,mean,cumulative,10,0.05906729085156677,1200
+Chronos-T5 Base 200M,mean,cumulative,11,0.06219849003933629,1200
+Chronos-T5 Base 200M,mean,cumulative,12,0.06288981288824874,1200
+Chronos-T5 Base 200M,mean,cumulative,13,0.06250245414752069,1200
+Chronos-T5 Base 200M,mean,cumulative,14,0.06971102553422029,1200
+Chronos-T5 Base 200M,mean,cumulative,15,0.07544080318959628,1200
+Chronos-T5 Base 200M,mean,cumulative,16,0.0749646748397346,1200
+Chronos-T5 Base 200M,mean,cumulative,17,0.0797717678760278,1200
+Chronos-T5 Base 200M,mean,cumulative,18,0.07897716119331537,1200
+Chronos-T5 Base 200M,mean,cumulative,19,0.08615229535539633,1200
+Chronos-T5 Base 200M,mean,cumulative,20,0.08741368202991258,1200
+Chronos-T5 Base 200M,median,cumulative,1,0.0178308110586257,1200
+Chronos-T5 Base 200M,median,cumulative,2,0.024159163896457763,1200
+Chronos-T5 Base 200M,median,cumulative,3,0.027789192609329175,1200
+Chronos-T5 Base 200M,median,cumulative,4,0.03110835499765491,1200
+Chronos-T5 Base 200M,median,cumulative,5,0.039472166029594094,1200
+Chronos-T5 Base 200M,median,cumulative,6,0.045349965535712716,1200
+Chronos-T5 Base 200M,median,cumulative,7,0.04874284114018976,1200
+Chronos-T5 Base 200M,median,cumulative,8,0.049136311509867775,1200
+Chronos-T5 Base 200M,median,cumulative,9,0.05312854506330551,1200
+Chronos-T5 Base 200M,median,cumulative,10,0.059059903711163715,1200
+Chronos-T5 Base 200M,median,cumulative,11,0.06218808004734849,1200
+Chronos-T5 Base 200M,median,cumulative,12,0.06288186614805133,1200
+Chronos-T5 Base 200M,median,cumulative,13,0.06250480269607772,1200
+Chronos-T5 Base 200M,median,cumulative,14,0.06969127962610344,1200
+Chronos-T5 Base 200M,median,cumulative,15,0.0754411560074909,1200
+Chronos-T5 Base 200M,median,cumulative,16,0.07496648854462395,1200
+Chronos-T5 Base 200M,median,cumulative,17,0.07979794809469609,1200
+Chronos-T5 Base 200M,median,cumulative,18,0.07897006100399585,1200
+Chronos-T5 Base 200M,median,cumulative,19,0.08615228113065256,1200
+Chronos-T5 Base 200M,median,cumulative,20,0.08740532165096257,1200
+Financial Chronos 46M,mean,daily,1,0.01824478994286776,1200
+Financial Chronos 46M,mean,daily,2,0.015944381527354126,1200
+Financial Chronos 46M,mean,daily,3,0.02016774532496111,1200
+Financial Chronos 46M,mean,daily,4,0.0195814622510852,1200
+Financial Chronos 46M,mean,daily,5,0.018401748524420787,1200
+Financial Chronos 46M,mean,daily,6,0.017542389011913948,1200
+Financial Chronos 46M,mean,daily,7,0.015632001132251938,1200
+Financial Chronos 46M,mean,daily,8,0.01988916304006354,1200
+Financial Chronos 46M,mean,daily,9,0.019253109469902083,1200
+Financial Chronos 46M,mean,daily,10,0.017139846628536733,1200
+Financial Chronos 46M,mean,daily,11,0.018956117165315027,1200
+Financial Chronos 46M,mean,daily,12,0.016752636226521567,1200
+Financial Chronos 46M,mean,daily,13,0.020644582504177434,1200
+Financial Chronos 46M,mean,daily,14,0.018469959016057455,1200
+Financial Chronos 46M,mean,daily,15,0.02028364309491511,1200
+Financial Chronos 46M,mean,daily,16,0.013894142100897892,1200
+Financial Chronos 46M,mean,daily,17,0.02134533131370981,1200
+Financial Chronos 46M,mean,daily,18,0.015603752608986745,1200
+Financial Chronos 46M,mean,daily,19,0.02572203955993648,1200
+Financial Chronos 46M,mean,daily,20,0.021995497771669356,1200
+Financial Chronos 46M,median,daily,1,0.018255538392745945,1200
+Financial Chronos 46M,median,daily,2,0.015914736078599816,1200
+Financial Chronos 46M,median,daily,3,0.020210677261898714,1200
+Financial Chronos 46M,median,daily,4,0.019276097815424834,1200
+Financial Chronos 46M,median,daily,5,0.018281518785798447,1200
+Financial Chronos 46M,median,daily,6,0.01743510083910944,1200
+Financial Chronos 46M,median,daily,7,0.015623662950344402,1200
+Financial Chronos 46M,median,daily,8,0.019853004380800808,1200
+Financial Chronos 46M,median,daily,9,0.01921838600378974,1200
+Financial Chronos 46M,median,daily,10,0.017139278022450223,1200
+Financial Chronos 46M,median,daily,11,0.01895425866816358,1200
+Financial Chronos 46M,median,daily,12,0.016706490397805345,1200
+Financial Chronos 46M,median,daily,13,0.02064721574745842,1200
+Financial Chronos 46M,median,daily,14,0.018503463567958813,1200
+Financial Chronos 46M,median,daily,15,0.02029267027754716,1200
+Financial Chronos 46M,median,daily,16,0.013828534717388145,1200
+Financial Chronos 46M,median,daily,17,0.021314099618767006,1200
+Financial Chronos 46M,median,daily,18,0.015596246970064247,1200
+Financial Chronos 46M,median,daily,19,0.025734609046042342,1200
+Financial Chronos 46M,median,daily,20,0.022005945731776562,1200
+Financial Chronos 46M,mean,cumulative,1,0.018155457836851824,1200
+Financial Chronos 46M,mean,cumulative,2,0.024481745458055572,1200
+Financial Chronos 46M,mean,cumulative,3,0.0271764683818065,1200
+Financial Chronos 46M,mean,cumulative,4,0.031875042177148774,1200
+Financial Chronos 46M,mean,cumulative,5,0.040929057085918576,1200
+Financial Chronos 46M,mean,cumulative,6,0.04768683503848588,1200
+Financial Chronos 46M,mean,cumulative,7,0.05086177649412684,1200
+Financial Chronos 46M,mean,cumulative,8,0.05025914717277456,1200
+Financial Chronos 46M,mean,cumulative,9,0.054524661325811734,1200
+Financial Chronos 46M,mean,cumulative,10,0.05946233215003605,1200
+Financial Chronos 46M,mean,cumulative,11,0.06240461373187305,1200
+Financial Chronos 46M,mean,cumulative,12,0.061814121597767384,1200
+Financial Chronos 46M,mean,cumulative,13,0.06182747597323776,1200
+Financial Chronos 46M,mean,cumulative,14,0.06869222600386675,1200
+Financial Chronos 46M,mean,cumulative,15,0.07369823594681467,1200
+Financial Chronos 46M,mean,cumulative,16,0.07310213540484142,1200
+Financial Chronos 46M,mean,cumulative,17,0.07783853304345294,1200
+Financial Chronos 46M,mean,cumulative,18,0.0766265958077752,1200
+Financial Chronos 46M,mean,cumulative,19,0.08227570450471865,1200
+Financial Chronos 46M,mean,cumulative,20,0.08334567958167718,1200
+Financial Chronos 46M,median,cumulative,1,0.018159885851010412,1200
+Financial Chronos 46M,median,cumulative,2,0.024361111107449162,1200
+Financial Chronos 46M,median,cumulative,3,0.02708708566085056,1200
+Financial Chronos 46M,median,cumulative,4,0.031807046151959596,1200
+Financial Chronos 46M,median,cumulative,5,0.040793730721526415,1200
+Financial Chronos 46M,median,cumulative,6,0.0475237581624805,1200
+Financial Chronos 46M,median,cumulative,7,0.05072691767046575,1200
+Financial Chronos 46M,median,cumulative,8,0.05008688870073723,1200
+Financial Chronos 46M,median,cumulative,9,0.0543932267652438,1200
+Financial Chronos 46M,median,cumulative,10,0.05941689741815935,1200
+Financial Chronos 46M,median,cumulative,11,0.06238043191806981,1200
+Financial Chronos 46M,median,cumulative,12,0.06176396653027855,1200
+Financial Chronos 46M,median,cumulative,13,0.061769129148980396,1200
+Financial Chronos 46M,median,cumulative,14,0.06864610499048215,1200
+Financial Chronos 46M,median,cumulative,15,0.0737499075445988,1200
+Financial Chronos 46M,median,cumulative,16,0.07312496140073663,1200
+Financial Chronos 46M,median,cumulative,17,0.07791204670796477,1200
+Financial Chronos 46M,median,cumulative,18,0.07675138530028182,1200
+Financial Chronos 46M,median,cumulative,19,0.0824270005715984,1200
+Financial Chronos 46M,median,cumulative,20,0.08348954895874865,1200
+Chronos-2 120M (native quantiles),native median (q0.50),daily,1,0.017545905831190246,1200
+Chronos-2 120M (native quantiles),native median (q0.50),daily,2,0.016228525435072083,1200
+Chronos-2 120M (native quantiles),native median (q0.50),daily,3,0.02074594774324521,1200
+Chronos-2 120M (native quantiles),native median (q0.50),daily,4,0.019348410886232594,1200
+Chronos-2 120M (native quantiles),native median (q0.50),daily,5,0.018426530416059402,1200
+Chronos-2 120M (native quantiles),native median (q0.50),daily,6,0.017768718045957917,1200
+Chronos-2 120M (native quantiles),native median (q0.50),daily,7,0.015712696271593458,1200
+Chronos-2 120M (native quantiles),native median (q0.50),daily,8,0.019826878262774208,1200
+Chronos-2 120M (native quantiles),native median (q0.50),daily,9,0.019325530309684733,1200
+Chronos-2 120M (native quantiles),native median (q0.50),daily,10,0.01711747517714879,1200
+Chronos-2 120M (native quantiles),native median (q0.50),daily,11,0.01897262058972878,1200
+Chronos-2 120M (native quantiles),native median (q0.50),daily,12,0.016487949864111926,1200
+Chronos-2 120M (native quantiles),native median (q0.50),daily,13,0.02070601846004537,1200
+Chronos-2 120M (native quantiles),native median (q0.50),daily,14,0.018679331966846763,1200
+Chronos-2 120M (native quantiles),native median (q0.50),daily,15,0.02040703201538106,1200
+Chronos-2 120M (native quantiles),native median (q0.50),daily,16,0.013863649121007172,1200
+Chronos-2 120M (native quantiles),native median (q0.50),daily,17,0.02147078387689017,1200
+Chronos-2 120M (native quantiles),native median (q0.50),daily,18,0.015604976103377338,1200
+Chronos-2 120M (native quantiles),native median (q0.50),daily,19,0.025599748459193664,1200
+Chronos-2 120M (native quantiles),native median (q0.50),daily,20,0.022039088901660956,1200
+Zero-return baseline,zero,daily,1,0.01779880760641346,1200
+Zero-return baseline,zero,daily,2,0.015907791555516138,1200
+Zero-return baseline,zero,daily,3,0.02054342329453301,1200
+Zero-return baseline,zero,daily,4,0.019268673183895715,1200
+Zero-return baseline,zero,daily,5,0.018253706041178916,1200
+Zero-return baseline,zero,daily,6,0.017357202946874404,1200
+Zero-return baseline,zero,daily,7,0.015619136802230548,1200
+Zero-return baseline,zero,daily,8,0.019878968221436026,1200
+Zero-return baseline,zero,daily,9,0.019208627128319177,1200
+Zero-return baseline,zero,daily,10,0.017158704436731655,1200
+Zero-return baseline,zero,daily,11,0.018955217370069947,1200
+Zero-return baseline,zero,daily,12,0.016718679933204444,1200
+Zero-return baseline,zero,daily,13,0.02065613997682328,1200
+Zero-return baseline,zero,daily,14,0.01850379983611114,1200
+Zero-return baseline,zero,daily,15,0.020292706374157105,1200
+Zero-return baseline,zero,daily,16,0.013821583681537474,1200
+Zero-return baseline,zero,daily,17,0.021306178276480937,1200
+Zero-return baseline,zero,daily,18,0.015589481848025406,1200
+Zero-return baseline,zero,daily,19,0.025738871168045654,1200
+Zero-return baseline,zero,daily,20,0.02198847403276884,1200
+Zero-return baseline,zero,cumulative,1,0.017697847787244064,1200
+Zero-return baseline,zero,cumulative,2,0.02384858918674785,1200
+Zero-return baseline,zero,cumulative,3,0.027355000044101425,1200
+Zero-return baseline,zero,cumulative,4,0.03128338555049949,1200
+Zero-return baseline,zero,cumulative,5,0.0398875973534694,1200
+Zero-return baseline,zero,cumulative,6,0.04618081275281587,1200
+Zero-return baseline,zero,cumulative,7,0.04926287967149881,1200
+Zero-return baseline,zero,cumulative,8,0.04913528994374274,1200
+Zero-return baseline,zero,cumulative,9,0.05355242149742026,1200
+Zero-return baseline,zero,cumulative,10,0.05901979211170217,1200
+Zero-return baseline,zero,cumulative,11,0.06205890642517469,1200
+Zero-return baseline,zero,cumulative,12,0.06193820175593822,1200
+Zero-return baseline,zero,cumulative,13,0.06155248861642645,1200
+Zero-return baseline,zero,cumulative,14,0.06868203702557651,1200
+Zero-return baseline,zero,cumulative,15,0.0738863725724831,1200
+Zero-return baseline,zero,cumulative,16,0.07337518010122346,1200
+Zero-return baseline,zero,cumulative,17,0.07816635355779092,1200
+Zero-return baseline,zero,cumulative,18,0.07703579696321203,1200
+Zero-return baseline,zero,cumulative,19,0.08270052881511042,1200
+Zero-return baseline,zero,cumulative,20,0.0838589216136006,1200

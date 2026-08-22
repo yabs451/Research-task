@@ -1,0 +1,13 @@
+2026-08-22 01:38:09,150 INFO exploratory_evaluation: Loaded 9 complete 12-round probability sets (LGBM/KNN excluded: stopped at round 11, no 12-round forecast).
+2026-08-22 01:38:09,222 INFO exploratory_evaluation: RPS cross-check | Naive (0.2 each): recomputed 0.160000 vs saved 0.160000 -> MATCH
+2026-08-22 01:38:09,222 INFO exploratory_evaluation: RPS cross-check | Chronos-T5 Base 200M: recomputed 0.226899 vs saved 0.226899 -> MATCH
+2026-08-22 01:38:09,222 INFO exploratory_evaluation: RPS cross-check | Financial Chronos 46M: recomputed 0.179368 vs saved 0.179368 -> MATCH
+2026-08-22 01:38:09,222 INFO exploratory_evaluation: RPS cross-check | Chronos-2 120M (independent): recomputed 0.165559 vs saved 0.165559 -> MATCH
+2026-08-22 01:38:09,222 INFO exploratory_evaluation: RPS cross-check | Chronos-2 120M (copula): recomputed 0.165418 vs saved 0.165418 -> MATCH
+2026-08-22 01:38:09,222 INFO exploratory_evaluation: RPS cross-check | LightGBM / no-KNN: recomputed 0.157432 vs saved 0.157432 -> MATCH
+2026-08-22 01:38:09,222 INFO exploratory_evaluation: RPS cross-check | RF / KNN: recomputed 0.157149 vs saved 0.157149 -> MATCH
+2026-08-22 01:38:09,222 INFO exploratory_evaluation: RPS cross-check | RF / no-KNN: recomputed 0.157053 vs saved 0.157053 -> MATCH
+2026-08-22 01:38:09,222 INFO exploratory_evaluation: RPS cross-check | Softmax / KNN: recomputed 0.157355 vs saved 0.157355 -> MATCH
+2026-08-22 01:38:09,225 INFO exploratory_evaluation: Wrote C:\Users\13327\OneDrive\Desktop\Research 2nd try\Research-task\Results\Evaluation\exploratory_model_metrics.csv (9 models)
+2026-08-22 01:38:09,640 INFO exploratory_evaluation: Wrote C:\Users\13327\OneDrive\Desktop\Research 2nd try\Research-task\Results\Evaluation\exploratory_tsfm_return_rmse.csv (220 rows)
+2026-08-22 01:38:09,645 WARNING exploratory_evaluation: Chronos-2 scenario arrays are NOT retained; the post-processing cumulative-RMSE comparison (specification 3C) cannot be computed and was skipped.

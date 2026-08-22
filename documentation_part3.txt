@@ -603,3 +603,402 @@ Runtime
 ================================================================================
 END OF STAGE 9 - SOFTMAX REGRESSION.
 ================================================================================
+
+--------------------------------------------------------------------------------
+J. STAGE 10 (EXPLORATORY) - ADDITIONAL EVALUATION METRICS AND TSFM RETURN-ERROR
+   DIAGNOSTICS
+   (executed 2026-08-22)
+--------------------------------------------------------------------------------
+
+STATUS OF THIS ENTIRE SECTION: EXPLORATORY.
+  Every metric and figure recorded here is a CANDIDATE for the final research
+  report. Their presence implies no decision to keep them. Several are likely to
+  be dropped after review, and the section notes where that seems likely. No
+  metric-selection decision has been made.
+
+  Nothing was rerun, retrained or regenerated. All numbers come from retained
+  artifacts. Verified: the SHA-256 of every pre-existing file under Results/
+  (19 CSVs, 44 NPZs, 6 reports, 2 JSON) is byte-identical before and after this
+  stage.
+
+Specifications evaluated
+  Complete 12-round probability forecasts exist, and were used, for:
+    Feature-based : RF/no-KNN, RF/KNN, LightGBM/no-KNN, Softmax/KNN
+    TSFM          : Chronos-2 (copula), Chronos-2 (independent),
+                    Financial Chronos 46M, Chronos-T5 Base 200M
+    Benchmark     : naive [0.2, 0.2, 0.2, 0.2, 0.2]
+  LightGBM/KNN is EXCLUDED from every aggregate: it was stopped at M6 round 11
+  and has no 12-round forecast. It appears only as a clearly labelled
+  incomplete-experiment note in the notebook.
+  All nine share exactly the same 1,200 held-out asset-round observations, in the
+  same order, verified by an explicit key alignment against the official ground
+  truth.
+
+--------------------------------------------------------------------------------
+J.1 THE FOUR COMMON METRICS
+--------------------------------------------------------------------------------
+
+For each metric: what it measures, why it is being considered, direction, what
+it does NOT measure, the result, and what that appears to suggest.
+
+=== RPS (Ranked Probability Score) - PRIMARY M6 METRIC ===
+
+  MEASURES. The squared error between the cumulative predicted quintile
+  distribution and the cumulative realised one, averaged over quintiles and
+  assets. Because it is cumulative, placing probability mass two quintiles away
+  from the truth is penalised more than placing it one quintile away.
+
+  WHY CONSIDERED. It is the official M6 forecasting metric and the metric every
+  earlier stage of this project used. Computed here with the project's own
+  `rps_scores`, imported unchanged - no new definition was introduced.
+
+  DIRECTION. Lower is better. Naive = 0.160000.
+
+  DOES NOT MEASURE. Whether the single most likely quintile is right; whether
+  probabilities are calibrated in the absolute sense; economic value.
+
+  RESULT.
+    RF / no-KNN                   0.157053
+    RF / KNN                      0.157149
+    Softmax / KNN                 0.157355
+    LightGBM / no-KNN             0.157432
+    Naive                         0.160000
+    Chronos-2 (copula)            0.165418
+    Chronos-2 (independent)       0.165559
+    Financial Chronos 46M         0.179368
+    Chronos-T5 Base 200M          0.226899
+  All nine recomputed values reproduce the previously saved figures exactly
+  (checked to 1e-6 against model_comparison_rps.csv, the two chronos2_*_rps.csv
+  files, feature_baseline_m6_rps.csv and softmax_m6_rps.csv).
+
+  SUGGESTS. The result already established in sections D and I: the four
+  feature-based classifiers beat the uniform forecast, every TSFM does not.
+
+=== ACCURACY (exact quintile) ===
+
+  MEASURES. How often argmax(probabilities) equals the realised quintile.
+
+  WHY CONSIDERED. It is the most intuitive summary of a five-class forecast and
+  is reported by the reference methodology, so it provides an accessible
+  secondary check on RPS.
+
+  DIRECTION. Higher is better. Random = 0.200.
+
+  DOES NOT MEASURE. How far a wrong prediction was from the truth - predicting
+  Q1 when the truth is Q5 counts the same as predicting Q4 - and it ignores the
+  entire probability distribution apart from its argmax. It is also noisy: 100
+  assets per round.
+
+  RESULT.
+    Softmax / KNN            0.2700       Chronos-2 (copula)      0.2658
+    RF / no-KNN              0.2650       Chronos-2 (independent) 0.2475
+    RF / KNN                 0.2592       Chronos-T5 Base 200M    0.2292
+    LightGBM / no-KNN        0.2583       Financial Chronos 46M   0.2233
+    Naive                    0.2000
+
+  SUGGESTS. Accuracy and RPS DISAGREE, and informatively so. Chronos-2 (copula)
+  achieves 0.2658 - statistically indistinguishable from RF/no-KNN's 0.2650 -
+  yet its RPS is 0.1654 against RF's 0.1571. So Chronos-2 is roughly as good at
+  naming the single most likely quintile, and much worse at expressing the rest
+  of the distribution. This is a concrete argument for keeping RPS primary and
+  treating accuracy as a secondary descriptive statistic only. Note also that
+  the naive forecast's 0.200 is an artifact of argmax on a tied vector (it always
+  picks Q1); accuracy is not meaningful for it.
+
+=== MACRO ONE-VS-REST ROC-AUC ===
+
+  MEASURES. Discrimination: whether assets that truly belong to quintile q tend
+  to receive a higher predicted probability for q than assets that do not. One
+  ROC curve per quintile (Q1 vs rest, ..., Q5 vs rest), each AUC computed over
+  all 1,200 observations, then averaged so every quintile contributes equally.
+
+  FULL ROC-AUC, NOT PARTIAL. The reference implementation
+  (Calculate_metrics.py::calc_pauc) uses `roc_auc_score(..., max_fpr=0.25)`.
+  That is NOT adopted here. The reason is methodological rather than deferential:
+  this project has no independently motivated false-positive-rate threshold that
+  would justify evaluating only the left-hand part of the ROC curve. Restricting
+  to a cutoff would embed an operational decision rule the project has not
+  defined. A unit test asserts the implemented value is the full-curve AUC and
+  differs from the partial one.
+
+  DIRECTION. Higher is better. 0.5 = no skill.
+
+  DOES NOT MEASURE. Calibration - AUC is invariant to any monotone rescaling of
+  the probabilities, so a wildly overconfident model can have a good AUC. It also
+  does NOT respect the ordinal structure of the quintiles: one-vs-rest treats Q1
+  and Q5 as merely different labels. RPS is the metric that handles ordering.
+
+  RESULT (macro, then per quintile).
+    model                          macro     Q1     Q2     Q3     Q4     Q5
+    Softmax / KNN                  0.6120  0.640  0.558  0.625  0.598  0.640
+    RF / no-KNN                    0.6102  0.652  0.533  0.635  0.591  0.640
+    RF / KNN                       0.6086  0.650  0.538  0.635  0.583  0.636
+    LightGBM / no-KNN              0.6048  0.640  0.537  0.639  0.572  0.637
+    Chronos-2 (copula)             0.5992  0.606  0.549  0.656  0.580  0.605
+    Chronos-2 (independent)        0.5860  0.597  0.546  0.643  0.546  0.598
+    Chronos-T5 Base 200M           0.5398  0.573  0.487  0.590  0.537  0.512
+    Financial Chronos 46M          0.5338  0.590  0.478  0.515  0.554  0.532
+    Naive                          0.5000  (tied scores throughout)
+
+  SUGGESTS. Two things. First, the whole field spans only 0.534-0.612, so all
+  models discriminate weakly and the spread between families is modest - far
+  smaller, proportionally, than the spread in calibration below. Second, there is
+  real per-quintile heterogeneity: Q2 is hardest for every model (0.478-0.558,
+  with two TSFMs below 0.5), while the extreme quintiles Q1 and Q5 are the most
+  separable for the feature-based models (~0.64). A plausible reading is that
+  large four-week movers are easier to anticipate than assets sitting just below
+  the median, but this is 12 rounds of data and should not be pressed hard.
+
+=== EXPECTED CALIBRATION ERROR (ECE) ===
+
+  DEFINITION USED - RECORDED EXPLICITLY. The standard top-label (confidence) ECE
+  of Guo et al. (2017) with uniform-width binning:
+      confidence_i = max_k p_ik            (probability of the predicted class)
+      correct_i    = 1{argmax_k p_ik == realised quintile_i}
+      ECE = sum_m (|B_m| / n) * | mean(confidence in B_m) - mean(correct in B_m) |
+  over equal-width bins B_m of the [0, 1] confidence range.
+
+  The reference implementation was inspected before choosing: this is EXACTLY
+  what Calculate_metrics.py::calc_ece does, including uniform binning, the
+  argmax-of-truth label, and a default of M = 5 bins. Because the source both
+  specifies a conventional implementation AND states its bin count, that value
+  is adopted as the primary figure - it was not silently invented, and it keeps
+  the number comparable with the source methodology.
+
+  CONFIDENCE QUANTITY CALIBRATED: the top-label probability, i.e. how sure the
+  model is about the quintile it actually predicts. NUMBER OF BINS: 5 primary,
+  with 10 and 15 also computed. Reporting three binnings is deliberate: ECE is
+  known to be sensitive to bin count and a single binning can hide that. With
+  five classes the minimum possible confidence is 0.2, so the low bins are empty
+  by construction and a coarse binning is less damaging than it would be in a
+  binary problem.
+
+  DIRECTION. Lower is better. 0 = perfectly calibrated top-label probabilities.
+
+  DOES NOT MEASURE. Calibration of the non-predicted classes (only the top label
+  enters); discrimination; ordinal distance. ECE is also biased by bin count and
+  by sample size, and with 1,200 observations spread over 5 bins some bins are
+  thin. It should be read as a diagnostic, not a precise quantity.
+
+  RESULT (5 / 10 / 15 bins; mean confidence; accuracy).
+    model                        ECE5    ECE10   ECE15   conf.   acc.
+    Naive                       0.0000  0.0000  0.0000  0.200  0.200
+    RF / no-KNN                 0.0047  0.0050  0.0192  0.270  0.265
+    Softmax / KNN               0.0076  0.0173  0.0127  0.270  0.270
+    LightGBM / no-KNN           0.0117  0.0184  0.0187  0.270  0.258
+    RF / KNN                    0.0155  0.0155  0.0207  0.275  0.259
+    Chronos-2 (copula)          0.0459  0.0459  0.0459  0.312  0.266
+    Chronos-2 (independent)     0.0652  0.0652  0.0652  0.313  0.248
+    Financial Chronos 46M       0.1728  0.1728  0.1728  0.396  0.223
+    Chronos-T5 Base 200M        0.2999  0.2999  0.2999  0.529  0.229
+
+  A NOTE ON THE IDENTICAL COLUMNS. For the four TSFMs the ECE is the same at 5,
+  10 and 15 bins. That is not an error: when the confidence-minus-accuracy gap
+  has the SAME SIGN in every populated bin, the binned weighted average collapses
+  algebraically to the global |mean confidence - accuracy|. The table shows
+  exactly that (e.g. Chronos-T5: 0.529 - 0.229 = 0.300). The TSFMs are
+  uniformly overconfident, so their ECE is binning-invariant. The feature-based
+  models' gaps change sign across bins, which is why their ECE moves with the
+  binning - and why their small ECE values should be read as "close to
+  calibrated", not as precisely ranked.
+
+  SUGGESTS. This is the clearest single finding of the exploratory stage. The
+  TSFMs are not merely uninformative; they are systematically OVERCONFIDENT.
+  Chronos-T5 asserts an average 52.9% confidence in its chosen quintile while
+  being right 22.9% of the time. The feature-based classifiers sit within about
+  0.005-0.016 of perfect top-label calibration, essentially because their
+  predicted probabilities stay near 0.27 - close to the 0.20 base rate.
+
+--------------------------------------------------------------------------------
+J.2 TSFM RETURN RMSE - AND WHY THE CLASSIFIERS DO NOT RECEIVE IT
+--------------------------------------------------------------------------------
+
+  WHY RF / LIGHTGBM / SOFTMAX ARE EXCLUDED. They are classifiers over quintile
+  membership. They never emit a numerical forecast of a future return, so there
+  is no quantity to difference against a realised return. Placing them in a
+  shared RMSE table would require inventing a return forecast they did not make.
+  RMSE is therefore reported strictly as a TSFM-specific diagnostic and is kept
+  out of the common metric table.
+
+  TWO DISTINCT QUANTITIES, deliberately kept separate:
+    DAILY RMSE AT HORIZON h    - error in the return specifically h days ahead.
+    CUMULATIVE RMSE AT h       - error in the TOTAL return accumulated from day 1
+                                 through day h.
+  Cumulative RMSE at h = 20 is the diagnostic most directly relevant to the M6
+  task, because the competition target is the four-week return.
+
+  DATA AND CONVENTIONS. Sampled trajectories are daily LOG returns of shape
+  (100 assets, 100 samples, 20 days). Realised values are the Dataset A daily
+  log returns the models were asked to forecast. Cumulative simple returns use
+  the project's own identity R = exp(sum of daily log returns) - 1, applied per
+  sampled path before aggregation, so the reported statistic is the centre of the
+  cumulative distribution rather than the cumulation of the centre. Each RMSE
+  pools 1,200 asset-round observations at that horizon.
+
+  A ZERO-FORECAST REFERENCE WAS ADDED. RMSE on returns is uninterpretable in
+  isolation, because a return series has an error floor set by its own
+  volatility. A "forecast exactly zero" row was therefore computed as a
+  reference. It is a trivially derived benchmark, not a model, and it is what
+  makes the rest of the table readable.
+
+  RESULT - DAILY RMSE (log-return units)
+    horizon                       h=1      h=5     h=10     h=15     h=20
+    Chronos-T5 (mean)          0.017895 0.018153 0.017200 0.020465 0.022004
+    Chronos-T5 (median)        0.017915 0.018156 0.017193 0.020459 0.022007
+    Financial Chronos (mean)   0.018245 0.018402 0.017140 0.020284 0.021995
+    Financial Chronos (median) 0.018256 0.018282 0.017139 0.020293 0.022006
+    Chronos-2 native q0.50     0.017546 0.018427 0.017117 0.020407 0.022039
+    ZERO-FORECAST REFERENCE    0.017799 0.018254 0.017159 0.020293 0.021988
+
+  RESULT - CUMULATIVE RMSE (simple-return units)
+    horizon                       h=1      h=5     h=10     h=15     h=20
+    Chronos-T5 (mean)          0.017809 0.039493 0.059067 0.075441 0.087414
+    Chronos-T5 (median)        0.017831 0.039472 0.059060 0.075441 0.087405
+    Financial Chronos (mean)   0.018155 0.040929 0.059462 0.073698 0.083346
+    Financial Chronos (median) 0.018160 0.040794 0.059417 0.073750 0.083490
+    ZERO-FORECAST REFERENCE    0.017698 0.039888 0.059020 0.073886 0.083859
+
+  SUGGESTS.
+    (a) NO MATERIAL POINT-FORECAST SKILL. Every daily RMSE sits on the
+        zero-forecast floor to within about 1%. At h = 20 cumulative, Chronos-T5
+        (0.0874) is WORSE than forecasting zero (0.0839), and Financial Chronos
+        (0.0833) is better by 0.0005 - within noise. The sampled distributions'
+        centres carry essentially no information about the level of future
+        returns.
+    (b) DAILY RMSE DOES NOT DEGRADE MONOTONICALLY WITH HORIZON. It rises about
+        25% from h = 1 to h = 20, but non-monotonically - h = 10 is LOWER than
+        h = 1. The zero-forecast reference traces the same shape, which shows the
+        pattern is realised volatility varying across calendar days, not forecast
+        decay. It would be wrong to describe this as horizon deterioration.
+    (c) CUMULATIVE RMSE DOES RISE STEADILY, roughly like sqrt(h)
+        (0.0178 -> 0.0874, against sqrt(20) x 0.0178 = 0.0796). That is the
+        signature of unpredicted noise accumulating, and again the zero-forecast
+        reference rises the same way.
+    (d) MEAN VERSUS MEDIAN IS IMMATERIAL. Differences are order 1e-4 in
+        cumulative RMSE (e.g. Chronos-T5 at h = 20: 0.087414 vs 0.087405).
+        Nothing should be inferred about skewness of the predictive distribution
+        from differences this small.
+    (e) RMSE AND RPS TELL PARTLY DIFFERENT STORIES. Financial Chronos has both
+        slightly better cumulative RMSE and better RPS than Chronos-T5, which is
+        consistent. But Chronos-2 - the best TSFM on RPS - cannot be compared on
+        cumulative RMSE at all (below), and its native daily RMSE is
+        indistinguishable from the others. The RPS ordering among TSFMs appears
+        to be driven mainly by how the quintile distribution is formed and
+        calibrated, not by return-forecast accuracy.
+
+--------------------------------------------------------------------------------
+J.3 CHRONOS-2: WHAT COULD AND COULD NOT BE COMPUTED
+--------------------------------------------------------------------------------
+
+  NATIVE FORECAST (available, computed). The retained native output is
+  (100 assets x 20 days x 21 quantile levels) per round. The 0.50 quantile was
+  used as the point forecast and daily RMSE computed for h = 1..20 (table above).
+  NO cumulative figure is produced from it: the artifact provides marginal
+  quantiles per asset-day, and cumulating them would require an assumption about
+  joint dependence across days that the artifact does not supply.
+
+  POST-PROCESSING COMPARISON (NOT AVAILABLE - REPORTED, NOT REGENERATED).
+  Specification section 3C asked for cumulative-return RMSE for the two
+  scenario-generation methods. This CANNOT be computed from retained artifacts.
+  Both `scripts/evaluate_chronos2_independent_sampling.py` and
+  `scripts/evaluate_chronos2_spatiotemporal_copula.py` persist only the resulting
+  quintile probabilities, the RPS tables and the copula diagnostics. The
+  1,000-scenario arrays (100 assets x 1,000 scenarios x 20 days) are constructed
+  in memory and discarded. A filesystem search for any retained scenario array
+  found none.
+  Producing this diagnostic would require regenerating both scenario experiments
+  from the saved native quantiles. That was NOT done, and the user was not asked
+  to authorise it as part of this stage. The RPS comparison of the two methods
+  (copula 0.165418 vs independent 0.165559) remains available and is plotted.
+  RECOMMENDATION FOR FUTURE RUNS: persist the scenario arrays, or a compact
+  summary of them, if this diagnostic is wanted later.
+
+--------------------------------------------------------------------------------
+J.4 WHAT THE EXPLORATORY METRICS SUGGEST OVERALL
+--------------------------------------------------------------------------------
+
+  Stated conservatively; 12 rounds x 100 assets is a small sample and most
+  differences are small.
+
+  1. The families separate far more on CALIBRATION than on DISCRIMINATION. Macro
+     AUC spans 0.534-0.612 across all eight models; ECE spans 0.005-0.300. The
+     TSFMs' RPS deficit is largely a confidence problem, not a ranking problem.
+  2. Similar RPS does not imply similar accuracy, and vice versa - Chronos-2
+     (copula) is the clear counter-example.
+  3. Q2 is the hardest quintile to discriminate for every model; the extremes are
+     easiest for the feature-based models.
+  4. The TSFMs show no material numerical point-forecast skill on returns at any
+     horizon, judged against a zero forecast.
+  5. Among the feature-based models, the four completed specifications remain
+     separated by less than 0.0004 RPS, 0.012 accuracy and 0.008 macro AUC. They
+     should continue to be described as indistinguishable rather than ranked.
+
+  NOT CLAIMED. No causal explanation of why the TSFMs are overconfident; no claim
+  that better calibration would have made them beat the naive benchmark; no
+  ranking of the feature-based models; no economic interpretation.
+
+--------------------------------------------------------------------------------
+J.5 FILES AND VALIDATION
+--------------------------------------------------------------------------------
+
+Created
+  scripts/exploratory_evaluation.py
+      All metric and RMSE computation. Imports the project's own `rps_scores`
+      and `RANK_COLUMNS` rather than redefining them; exposes
+      `per_round_metrics()` and `reliability_curve()` for the notebook so no
+      logic is duplicated there.
+  Notebooks/Exploratory_Evaluation_And_Visualizations.ipynb
+      The visualization gallery, 16 code cells and 14 inline figures, each
+      labelled HIGH / MEDIUM / OPTIONAL with what it shows, why it may be useful,
+      and whether it is headline / diagnostic / sensitivity. No figure files are
+      exported.
+  Results/Evaluation/exploratory_model_metrics.csv
+      9 rows x 21 columns: model, family, n_observations, rps, rps_vs_naive,
+      accuracy, accuracy_vs_random, macro_roc_auc, roc_auc_q1..q5, ece_5bin,
+      ece_10bin, ece_15bin, mean_confidence, mean_max_minus_accuracy.
+  Results/Evaluation/exploratory_tsfm_return_rmse.csv
+      220 rows: model, point_forecast, rmse_type, horizon, rmse, n_observations.
+  tests/test_exploratory_evaluation.py
+      8 tests: ground truth is the official 1,200-observation set; all models
+      share the same aligned observations; Rank1..Rank5 runs worst to best; the
+      incomplete LightGBM/KNN experiment is excluded; RPS reproduces all nine
+      saved values; the AUC is full and provably differs from the partial one;
+      the ECE matches the documented top-label definition on constructed cases;
+      the RMSE table has the right shape, excludes the classifiers, gives
+      Chronos-2 daily rows only, and grows with horizon.
+  logs/exploratory_evaluation.log
+
+Modified
+  documentation_part3.txt (this section). Nothing else.
+
+Validation performed
+  - No model rerun or retrained; every input read-only.
+  - SHA-256 over all pre-existing Results/ artifacts is byte-identical to the
+    pre-stage baseline (03527d3b...487daa).
+  - All nine models scored on the SAME 1,200 aligned asset-round observations
+    (explicit key-order assertion, not just a row count).
+  - Probability column order is Rank1..Rank5 throughout; every row sums to 1.
+  - Realised quintile labels taken as argmax of the official truth; the truth is
+    fully one-hot (zero ties in all 12 rounds), so the label is unambiguous.
+  - RPS reproduced all nine saved values to 1e-6 BEFORE any new metric was
+    computed.
+  - ROC-AUC is full macro one-vs-rest, asserted to differ from max_fpr=0.25.
+  - ECE definition, confidence quantity and bin counts recorded above.
+  - TSFM forecasts aligned by asset symbol and forecast date from each NPZ;
+    forecast dates asserted present in the return panel; daily realised returns
+    taken from exactly the corresponding forecast day; cumulative realised and
+    predicted returns use the same horizon and the project's exp(sum)-1 identity.
+  - Mean/median point forecasts are labelled as distribution-centre diagnostics
+    only; the documentation states explicitly that they were NOT part of the M6
+    probability pipeline, which ranked assets separately inside each scenario and
+    counted quintile frequencies.
+  - LightGBM/KNN never enters an aggregate.
+  - Full project test suite: 98 tests pass.
+
+Runtime
+  Metric and RMSE computation about 12 seconds; notebook execution under a
+  minute. No execution issues.
+
+================================================================================
+END OF STAGE 10 (EXPLORATORY) - metric and figure selection remains open.
+================================================================================
